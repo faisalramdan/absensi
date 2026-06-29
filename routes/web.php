@@ -229,12 +229,16 @@ Route::middleware('auth')->group(function () {
         )->name('attendance-processor.generate');
 
     });
+    Route::get(
+        'attendance-monthly/employee/{employee}',
+        [AttendanceMonthlyController::class, 'show']
+    )->name('attendance-monthly.show');
+
     Route::resource(
         'attendance-monthly',
         AttendanceMonthlyController::class
     )->only([
-                'index',
-                'show'
+                'index'
             ]);
 
     Route::middleware(['auth'])->group(function () {

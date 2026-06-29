@@ -510,9 +510,7 @@ class AttendanceProcessorService
                     $shiftDetail->start_time,
 
                 'scheduled_check_out' =>
-                    $requiredCheckOut
-                    ? $requiredCheckOut->format('H:i:s')
-                    : null,
+                    $shiftDetail->end_time,
 
                 'actual_check_in' =>
                     $log->check_in,

@@ -110,154 +110,115 @@
                     </div>
                 </div>
 
-                 {{-- SUMMARY --}}
-                <div class="row mb-4">
+                {{-- SUMMARY BLOCK: STATISTIK KEHADIRAN --}}
+                <div class="col-xl-12 mb-4">
+                    <div class="card border-0 shadow-sm">
 
-                    <div class="col-xl-2 col-md-4">
-                        <div class="card border-0 shadow-sm bg-success-subtle">
-                            <div class="card-body">
-                                <small class="text-muted">Present</small>
-                                <h3 class="fw-bold text-success mb-0">
-                                    {{ number_format($summary['present']) }}
-                                </h3>
+                        <div class="card-header bg-transparent py-3">
+                            <h4 class="card-title mb-0 fw-semibold text-dark">Ringkasan Statistik Kehadiran</h4>
+                        </div>
+
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered align-middle mb-0">
+                                    <thead>
+                                        <tr class="bg-light text-muted small uppercase">
+                                            <th width="40%">Metrik / Status Kehadiran</th>
+                                            <th width="60%">Akumulasi Data & Keterangan Periode</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {{-- Status Utama Kehadiran --}}
+                                        <tr>
+                                            <th class="fw-semibold text-secondary">Status Kehadiran Utama</th>
+                                            <td>
+                                                <div class="d-flex flex-wrap gap-2">
+                                                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1.5 fw-semibold">
+                                                        Present: {{ number_format($summary['present']) }}
+                                                    </span>
+                                                    <span class="badge bg-info-subtle text-info border border-info-subtle px-2 py-1.5 fw-semibold">
+                                                        Sakit: {{ number_format($summary['sakit']) }}
+                                                    </span>
+                                                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1.5 fw-semibold">
+                                                        Ijin: {{ number_format($summary['ijin']) }}
+                                                    </span>
+                                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1.5 fw-semibold">
+                                                        Alpha: {{ number_format($summary['alpha']) }}
+                                                    </span>
+                                                    <span class="badge px-2 py-1.5 fw-semibold border" style="background-color: #f3e5f5; color: #8e24aa; border-color: #d1c4e9 !important;">
+                                                        Cuti: {{ number_format($summary['cuti']) }}
+                                                    </span>
+                                                    <span class="badge px-2 py-1.5 fw-semibold border" style="background-color: #e8eaf6; color: #3f51b5; border-color: #c5cae9 !important;">
+                                                        IDT: {{ number_format($summary['idt']) }}
+                                                    </span>
+                                                    <span class="badge px-2 py-1.5 fw-semibold border" style="background-color: #e0f2f1; color: #00796b; border-color: #b2dfdb !important;">
+                                                        IPC: {{ number_format($summary['ipc']) }}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        
+                                        {{-- Pelanggaran Waktu Masuk --}}
+                                        <tr>
+                                            <th class="fw-semibold text-secondary">Keterlambatan (Late)</th>
+                                            <td>
+                                                <span class="fw-bold text-warning">{{ number_format($summary['late']) }} Kali</span>
+                                                @if($summary['total_late_minutes'] > 0)
+                                                    <span class="text-muted small ms-2">
+                                                        (Total durasi: {{ $summary['late_hours'] }} Jam {{ $summary['late_minutes_remainder'] }} Menit)
+                                                    </span>
+                                                @endif
+                                            </td>
+                                        </tr>
+
+                                        {{-- Pelanggaran Waktu Pulang --}}
+                                        <tr>
+                                            <th class="fw-semibold text-secondary">Pulang Cepat (Early Leave)</th>
+                                            <td>
+                                                <span class="fw-bold" style="color: #00796b;">{{ number_format($summary['early_leave']) }} Kali</span>
+                                                @if($summary['total_early_leave_minutes'] > 0)
+                                                    <span class="text-muted small ms-2">
+                                                        (Total durasi: {{ $summary['early_leave_hours'] }} Jam {{ $summary['early_leave_minutes_remainder'] }} Menit)
+                                                    </span>
+                                                @endif
+                                            </td>
+                                        </tr>
+
+                                        {{-- Kelalaian Absen --}}
+                                        <tr>
+                                            <th class="fw-semibold text-secondary">Kelalaian Log Absensi</th>
+                                            <td>
+                                                <span class="text-danger fw-medium">
+                                                    Lupa Check-In: <strong>{{ $summary['forgot_check_in'] }}</strong> 
+                                                    <span class="text-muted mx-2">|</span> 
+                                                    Lupa Check-Out: <strong>{{ $summary['forgot_check_out'] }}</strong>
+                                                </span>
+                                            </td>
+                                        </tr>
+
+                                        {{-- Hari Kerja --}}
+                                        <tr>
+                                            <th class="fw-semibold text-secondary">Hari Kerja Resmi</th>
+                                            <td class="text-dark fw-medium">
+                                                {{ $workingDays }} Hari Kerja 
+                                                <span class="text-muted small fw-normal ms-2">
+                                                    (Dari {{ $calendarDays }} hari kalender - {{ $sundayCount }} Off - {{ $holidayCount }} Libur)
+                                                </span>
+                                            </td>
+                                        </tr>
+
+                                        {{-- Akumulasi Jam Kerja --}}
+                                        <tr class="table-success">
+                                            <th class="fw-bold text-success">Total Jam Kerja Efektif</th>
+                                            <td class="fs-5 fw-bold text-success">
+                                                {{ number_format($summary['total_work_minutes']/60, 1) }} <small class="fs-6 fw-normal">Jam</small>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
-
-                    <div class="col-xl-2 col-md-4">
-                        <div class="card border-0 shadow-sm bg-warning-subtle">
-                            <div class="card-body">
-                                <small class="text-muted">Late</small>
-                                <h3 class="fw-bold text-warning mb-0">
-                                    {{ number_format($summary['late']) }}
-                                </h3>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-xl-2 col-md-4">
-                        <div class="card border-0 shadow-sm bg-orange-subtle">
-                            <div class="card-body">
-                                <small class="text-muted">Early Leave</small>
-                                <h3 class="fw-bold text-orange mb-0">
-                                    {{ number_format($summary['early_leave']) }}
-                                </h3>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-xl-2 col-md-4">
-                        <div class="card border-0 shadow-sm bg-danger-subtle">
-                            <div class="card-body">
-                                <small class="text-muted">Forgot Check In</small>
-                                <h3 class="fw-bold text-danger mb-0">
-                                    {{ number_format($summary['forgot_check_in']) }}
-                                </h3>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-xl-2 col-md-4">
-                        <div class="card border-0 shadow-sm bg-danger-subtle">
-                            <div class="card-body">
-                                <small class="text-muted">Forgot Check Out</small>
-                                <h3 class="fw-bold text-danger mb-0">
-                                    {{ number_format($summary['forgot_check_out']) }}
-                                </h3>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-xl-2 col-md-4">
-                        <div class="card border-0 shadow-sm bg-danger-subtle">
-                            <div class="card-body">
-                                <small class="text-muted">Alpha</small>
-                                <h3 class="fw-bold text-danger mb-0">
-                                    {{ number_format($summary['alpha']) }}
-                                </h3>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-
-                <div class="row mb-4">
-
-                    <div class="col-xl-2 col-md-4">
-                        <div class="card border-0 shadow-sm bg-info-subtle">
-                            <div class="card-body">
-                                <small class="text-muted">Leave</small>
-                                <h3 class="fw-bold text-info mb-0">
-                                    {{ number_format($summary['leave']) }}
-                                </h3>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-xl-2 col-md-4">
-                        <div class="card border-0 shadow-sm bg-primary-subtle">
-                            <div class="card-body">
-                                <small class="text-muted">Holiday</small>
-                                <h3 class="fw-bold text-primary mb-0">
-                                    {{ number_format($summary['holiday']) }}
-                                </h3>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-xl-2 col-md-4">
-                        <div class="card border-0 shadow-sm bg-secondary-subtle">
-                            <div class="card-body">
-                                <small class="text-muted">Off</small>
-                                <h3 class="fw-bold text-secondary mb-0">
-                                    {{ number_format($summary['off']) }}
-                                </h3>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-xl-2 col-md-4">
-                        <div class="card border-0 shadow-sm bg-dark-subtle">
-                            <div class="card-body">
-                                <small class="text-muted">Hari Kerja</small>
-                                <h3 class="fw-bold text-dark mb-0">
-                                    {{ $workingDays }}
-                                </h3>
-                                <small class="text-muted">
-                                    {{ $calendarDays }} Hari •
-                                    {{ $sundayCount }} Minggu •
-                                    {{ $holidayCount }} Libur
-                                </small>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-xl-2 col-md-4">
-                        <div class="card border-0 shadow-sm bg-success-subtle">
-                            <div class="card-body">
-                                <small class="text-muted">Total Jam Kerja</small>
-                                <h3 class="fw-bold text-success mb-0">
-                                    {{ number_format($summary['total_work_minutes']/60,1) }}
-                                    Jam
-                                </h3>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-xl-2 col-md-4">
-                        <div class="card border-0 shadow-sm bg-warning-subtle">
-                            <div class="card-body">
-                                <small class="text-muted">Total Terlambat</small>
-                                <h3 class="fw-bold text-warning mb-0">
-                                    {{ number_format($summary['total_late_minutes']) }}
-                                </h3>
-                                <small class="text-muted">
-                                    Menit
-                                </small>
-                            </div>
-                        </div>
-                    </div>
-
                 </div>
 
                 {{-- TABLE --}}
@@ -394,9 +355,16 @@
                                                     $currentStatus = strtolower($attendance->status);
                                                     $class = $statusStyles[$currentStatus] ?? 'bg-light text-dark';
                                                 @endphp
+
                                                 <span class="badge {{ $class }} px-2 py-1 fw-semibold">
                                                     {{ strtoupper($attendance->status) }}
                                                 </span>
+
+                                                @if($currentStatus === 'leave' && $attendance->leaveType)
+                                                    <div class="small text-muted fw-bold mt-1" style="font-size: 0.75rem;">
+                                                        ({{ $attendance->leaveType->code }})
+                                                    </div>
+                                                @endif
                                             </td>
                                             <td class="text-center">
                                                 @switch($attendance->source)
