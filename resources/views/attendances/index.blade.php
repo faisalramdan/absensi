@@ -33,13 +33,13 @@
                     </div>
 
                     <div class="card-body">
-                        <form method="GET">
+                        <form method="GET" id="filterForm">
                             <div class="row align-items-end g-3">
 
                                 {{-- 1. Filter Tahun --}}
                                 <div class="col-md-2">
                                     <label class="form-label fw-semibold">Tahun Periode</label>
-                                    <select name="year" class="form-select">
+                                    <select name="year" id="filterYear" class="form-select">
                                         @for($y = date('Y'); $y >= date('Y') - 3; $y--)
                                             <option value="{{ $y }}" @selected($selectedYear == $y)>{{ $y }}</option>
                                         @endfor
@@ -49,7 +49,7 @@
                                 {{-- 2. Filter Bulan --}}
                                 <div class="col-md-2">
                                     <label class="form-label fw-semibold">Bulan Periode</label>
-                                    <select name="month" class="form-select">
+                                    <select name="month" id="filterMonth" class="form-select">
                                         @foreach([
                                             '01' => 'Januari', '02' => 'Februari', '03' => 'Maret', 
                                             '04' => 'April', '05' => 'Mei', '06' => 'Juni', 
@@ -61,16 +61,16 @@
                                     </select>
                                 </div>
 
-                                {{-- 3. Tanggal Start (Bisa diubah manual) --}}
+                                {{-- 3. Tanggal Start (Otomatis berubah via JS) --}}
                                 <div class="col-md-2">
                                     <label class="form-label fw-semibold text-primary">Tanggal Start</label>
-                                    <input type="date" name="start_date" value="{{ $startDate }}" class="form-control border-primary-subtle">
+                                    <input type="date" name="start_date" id="startDate" value="{{ $startDate }}" class="form-control border-primary-subtle">
                                 </div>
 
-                                {{-- 4. Tanggal End (Bisa diubah manual) --}}
+                                {{-- 4. Tanggal End (Otomatis berubah via JS) --}}
                                 <div class="col-md-2">
                                     <label class="form-label fw-semibold text-primary">Tanggal End</label>
-                                    <input type="date" name="end_date" value="{{ $endDate }}" class="form-control border-primary-subtle">
+                                    <input type="date" name="end_date" id="endDate" value="{{ $endDate }}" class="form-control border-primary-subtle">
                                 </div>
 
                                 {{-- 5. Pilih Karyawan --}}
@@ -99,7 +99,7 @@
                                     </select>
                                 </div>
 
-                                {{-- Tombol Aksi (Ditaruh di kanan bawah agar sejajar) --}}
+                                {{-- Tombol Aksi --}}
                                 <div class="col-12 d-flex justify-content-end gap-2 mt-3">
                                     <a href="{{ route('attendances.index') }}" class="btn btn-secondary px-4">Reset</a>
                                     <button type="submit" class="btn btn-primary px-4">Apply Filter</button>
@@ -449,8 +449,59 @@
         </div>
     </div>
 <script>
-document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
-    new bootstrap.Tooltip(el);
+document.addEventListener("DOMContentLoaded", function () {
+    /*
+    |--------------------------------------------------------------------------
+    | Inisialisasi Bootstrap Tooltip
+    |--------------------------------------------------------------------------
+    */
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+        new bootstrap.Tooltip(el);
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Logika Auto-Update Tanggal Cut-Off (26 - 25)
+    |--------------------------------------------------------------------------
+    */
+    const yearSelect = document.getElementById("filterYear");
+    const monthSelect = document.getElementById("filterMonth");
+    const startDateInput = document.getElementById("startDate");
+    const endDateInput = document.getElementById("endDate");
+
+    function updateCutoffDates() {
+        // Ambil nilai tahun dan bulan dari dropdown filter
+        const year = parseInt(yearSelect.value);
+        const month = parseInt(monthSelect.value); // Nilai riil: 1 - 12
+
+        // Validasi jika data input kosong atau corrupt, batalkan eksekusi
+        if (isNaN(year) || isNaN(month)) return;
+
+        // 1. Cari tanggal akhir (End Date): Tanggal 25 bulan ini
+        const endDateObj = new Date(year, month - 1, 25);
+        
+        // 2. Cari tanggal awal (Start Date): Tanggal 26 dari bulan lalu
+        // Jika bulan berjalan Januari (1), fungsi native JS otomatis mundur ke Desember tahun lalu.
+        const startDateObj = new Date(year, month - 2, 26);
+
+        // Helper fungsi format Date Object ke format input standar HTML: YYYY-MM-DD
+        const formatDate = (date) => {
+            const yyyy = date.getFullYear();
+            const mm = String(date.getMonth() + 1).padStart(2, '0');
+            const dd = String(date.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        };
+
+        // Render hasil kalkulasi tanggal ke layar pengguna
+        startDateInput.value = formatDate(startDateObj);
+        endDateInput.value = formatDate(endDateObj);
+    }
+
+    // Pasang Event Listener agar fungsi berjalan setiap kali dropdown berubah nilai
+    if (yearSelect && monthSelect) {
+        yearSelect.addEventListener("change", updateCutoffDates);
+        monthSelect.addEventListener("change", updateCutoffDates);
+    }
 });
 </script>
 @endsection

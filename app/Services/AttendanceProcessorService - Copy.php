@@ -265,195 +265,297 @@ class AttendanceProcessorService
         $date,
         $leaveRequest = null
     ) {
-        $startDateStr = $date->format('Y-m-d');
 
         /*
         |--------------------------------------------------------------------------
-        | Required Work Minutes (Otomatis Deteksi Hari Sabtu)
+        | Required Work Minutes
         |--------------------------------------------------------------------------
         */
-        // Jika hari Sabtu = 5 jam (300 menit), hari lainnya = 8 jam (480 menit)
-        $isSaturday = $date->isSaturday();
-        $requiredWorkMinutes = $isSaturday ? 300 : 480;
+
+        $shiftStart = Carbon::parse(
+            $date->format('Y-m-d') . ' ' . $shiftDetail->start_time
+        );
+
+        $shiftEnd = Carbon::parse(
+            $date->format('Y-m-d') . ' ' . $shiftDetail->end_time
+        );
+
+        $requiredWorkMinutes =
+            $shiftStart->diffInMinutes(
+                $shiftEnd
+            );
 
         /*
         |--------------------------------------------------------------------------
         | Actual Time
         |--------------------------------------------------------------------------
         */
+
         $actualIn = null;
         $actualOut = null;
 
         if (!empty($log->check_in)) {
-            $actualIn = Carbon::parse($startDateStr . ' ' . $log->check_in);
+
+            $actualIn = Carbon::parse(
+                $date->format('Y-m-d')
+                . ' '
+                . $log->check_in
+            );
+        }
+
+        if (!empty($log->check_out)) {
+
+            $actualOut = Carbon::parse(
+                $date->format('Y-m-d')
+                . ' '
+                . $log->check_out
+            );
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Set Batas Acuan Berdasarkan Shift di Database
+        | Forgot Attendance
         |--------------------------------------------------------------------------
         */
-        $shiftStart = Carbon::parse($startDateStr . ' ' . $shiftDetail->start_time);
-        $lateDeadline = Carbon::parse($startDateStr . ' ' . $shiftDetail->late_deadline);
 
-        // Tentukan shiftEnd dasar bawaan database
-        $shiftEnd = Carbon::parse($startDateStr . ' ' . $shiftDetail->end_time);
+        $forgotCheckIn =
+            empty($log->check_in);
 
-        // Jika hari sabtu, override tampilan schedule default shiftEnd agar maju sesuai durasi 5 jam
-        if ($isSaturday) {
-            $shiftEnd = $shiftStart->copy()->addMinutes($requiredWorkMinutes);
-        } elseif ($shiftEnd->lt($shiftStart)) {
-            // Proteksi jika shift dasar melewati tengah malam pada hari biasa
-            $shiftEnd->addDay();
+        $forgotCheckOut =
+            empty($log->check_out);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Late Deadline
+        |--------------------------------------------------------------------------
+        */
+
+        $lateDeadline = Carbon::parse(
+            $date->format('Y-m-d')
+            . ' '
+            . $shiftDetail->late_deadline
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Late Minutes
+        |--------------------------------------------------------------------------
+        */
+
+        $lateMinutes = 0;
+
+        if (
+            $actualIn &&
+            $actualIn->gt($lateDeadline)
+        ) {
+
+            $lateMinutes =
+                $lateDeadline->diffInMinutes(
+                    $actualIn
+                );
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Target Pulang Dinamis & Kunci Batas Jam Kerja (Support Sabtu)
+        | Required Check Out
         |--------------------------------------------------------------------------
         */
+
         $requiredCheckOut = null;
 
         if ($actualIn) {
-            $actualInTime = $actualIn->format('H:i:s');
 
-            // A. KONDISI UNTUK SHIFT FLUID MIDNIGHT (Khusus aturan main 00:00 Anda)
-            if ($shiftDetail->start_time === '00:00:00') {
-
-                // Jika Telat Parah (Lewat dari 01:00) -> Target pulang dikunci (Hari biasa jam 09:00, Sabtu jam 06:00)
-                if ($actualInTime > $shiftDetail->late_deadline && $actualInTime < '12:00:00') {
-                    $targetTime = $isSaturday ? '06:00:00' : '09:00:00';
-                    $requiredCheckOut = Carbon::parse($startDateStr . ' ' . $targetTime);
-                    $shiftEnd = Carbon::parse($startDateStr . ' ' . $targetTime);
-                } else {
-                    // Masuk Normal -> Target pulang = Jam Masuk + Durasi Wajib (Sabtu 5 jam, Biasa 8 jam)
-                    $requiredCheckOut = $actualIn->copy()->addMinutes($requiredWorkMinutes);
-                    $targetEnd = $isSaturday ? '05:00:00' : '08:00:00';
-                    $shiftEnd = Carbon::parse($startDateStr . ' ' . $targetEnd);
-                }
-
-            }
-            // B. KONDISI UNTUK SHIFT SORE ATAU SHIFT LAINNYA
-            else {
-                // Jika masuk normal sebelum batas telat -> Pulang adil (Jam Masuk + Durasi Wajib)
-                if ($actualInTime <= $shiftDetail->late_deadline) {
-                    $requiredCheckOut = $actualIn->copy()->addMinutes($requiredWorkMinutes);
-                } else {
-                    // Jika telat, target pulang dikunci berdasarkan base schedule + kompensasi menit telatnya
-                    $lateDiff = $lateDeadline->diffInMinutes($actualIn);
-                    $requiredCheckOut = $shiftEnd->copy()->addMinutes($lateDiff);
-                }
-            }
-        } else {
-            // Fallback jika lupa absen masuk
-            $requiredCheckOut = $shiftEnd->copy();
+            $requiredCheckOut =
+                $actualIn
+                    ->copy()
+                    ->addMinutes(
+                        $requiredWorkMinutes
+                    );
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Parse Jam Pulang Aktual & Proteksi Day-Crossing Overlap
+        | Work Minutes
         |--------------------------------------------------------------------------
         */
-        if (!empty($log->check_out)) {
-            $actualOut = Carbon::parse($startDateStr . ' ' . $log->check_out);
 
-            // Pengecekan overlap universal jika melewati tengah malam (terutama shift sore/malam)
-            if ($actualIn && $actualOut->lt($actualIn)) {
-                $actualOut->addDay();
-            }
-        }
-
-        $forgotCheckIn = empty($log->check_in);
-        $forgotCheckOut = empty($log->check_out);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Perhitungan Keterlambatan (Universal)
-        |--------------------------------------------------------------------------
-        */
-        $lateMinutes = 0;
-
-        if ($actualIn) {
-            $actualInTimeStr = $actualIn->format('H:i:s');
-
-            if ($actualInTimeStr > $shiftDetail->late_deadline) {
-                // Filter khusus Shift 00:00 agar tidak terbentur jam 23:xx malam sebelumnya
-                if ($shiftDetail->start_time === '00:00:00' && $actualInTimeStr >= '23:00:00') {
-                    $lateMinutes = 0;
-                } else {
-                    $lateMinutes = $lateDeadline->diffInMinutes($actualIn);
-                }
-            }
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Perhitungan Menit Kerja Aktual
-        |--------------------------------------------------------------------------
-        */
         $workMinutes = 0;
-        if ($actualIn && $actualOut) {
-            $workMinutes = $actualIn->diffInMinutes($actualOut);
-        }
 
-        if (($actualIn && !$actualOut) || (!$actualIn && $actualOut)) {
-            $workMinutes = $requiredWorkMinutes;
+        if (
+            $actualIn &&
+            $actualOut
+        ) {
+
+            $workMinutes =
+                $actualIn->diffInMinutes(
+                    $actualOut
+                );
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Perhitungan Pulang Cepat (Early Leave)
+        | Lupa Check Out
         |--------------------------------------------------------------------------
         */
+
+        if (
+            $actualIn &&
+            !$actualOut
+        ) {
+
+            $workMinutes =
+                $requiredWorkMinutes;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Lupa Check In
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            !$actualIn &&
+            $actualOut
+        ) {
+
+            $workMinutes =
+                $requiredWorkMinutes;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Early Leave
+        |--------------------------------------------------------------------------
+        */
+
         $earlyLeaveMinutes = 0;
-        if ($requiredCheckOut && $actualOut) {
-            if ($actualOut->lt($requiredCheckOut)) {
-                $earlyLeaveMinutes = $actualOut->diffInMinutes($requiredCheckOut);
-            }
-        }
 
-        $shortWorkMinutes = max(0, $requiredWorkMinutes - $workMinutes);
+        if (
+            $requiredCheckOut &&
+            $actualOut &&
+            $actualOut->lt(
+                $requiredCheckOut
+            )
+        ) {
+
+            $earlyLeaveMinutes =
+                $actualOut->diffInMinutes(
+                    $requiredCheckOut
+                );
+        }
 
         /*
         |--------------------------------------------------------------------------
-        | IDT / IPC Identification & Save Status
+        | Short Work
         |--------------------------------------------------------------------------
         */
+
+        $shortWorkMinutes =
+            max(
+                0,
+                $requiredWorkMinutes -
+                $workMinutes
+            );
+
+        /*
+        |--------------------------------------------------------------------------
+        | IDT / IPC
+        |--------------------------------------------------------------------------
+        */
+
         $isIdt = false;
         $isIpc = false;
+
         if ($leaveRequest) {
-            $code = $leaveRequest->leaveType?->code;
-            $isIdt = $code === 'I-IDT';
-            $isIpc = $code === 'I-IPC';
+
+            $code =
+                $leaveRequest
+                    ->leaveType
+                        ?->code;
+
+            $isIdt =
+                $code === 'I-IDT';
+
+            $isIpc =
+                $code === 'I-IPC';
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Status
+        |--------------------------------------------------------------------------
+        */
 
         $status = 'present';
 
+        /*
+        |--------------------------------------------------------------------------
+        | Save
+        |--------------------------------------------------------------------------
+        */
+
         return Attendance::updateOrCreate(
             [
-                'employee_id' => $assignment->employee_id,
-                'date' => $startDateStr
+                'employee_id' =>
+                    $assignment->employee_id,
+
+                'date' =>
+                    $date->format('Y-m-d')
             ],
             [
-                'shift_id' => $assignment->shift_id,
-                'scheduled_check_in' => $shiftDetail->start_time,
-                'scheduled_check_out' => $shiftEnd->format('H:i:s'),
-                'actual_check_in' => $log->check_in,
-                'actual_check_out' => $log->check_out,
-                'late_minutes' => $lateMinutes,
-                'early_leave_minutes' => $earlyLeaveMinutes,
-                'work_minutes' => $workMinutes,
-                'short_work_minutes' => $shortWorkMinutes,
-                'forgot_check_in' => $forgotCheckIn,
-                'forgot_check_out' => $forgotCheckOut,
-                'is_idt' => $isIdt,
-                'is_ipc' => $isIpc,
-                'leave_request_id' => $leaveRequest?->id,
-                'leave_type_id' => $leaveRequest?->leave_type_id,
-                'status' => $status,
+                'shift_id' =>
+                    $assignment->shift_id,
+
+                'scheduled_check_in' =>
+                    $shiftDetail->start_time,
+
+                'scheduled_check_out' =>
+                    $shiftDetail->end_time,
+
+                'actual_check_in' =>
+                    $log->check_in,
+
+                'actual_check_out' =>
+                    $log->check_out,
+
+                'late_minutes' =>
+                    $lateMinutes,
+
+                'early_leave_minutes' =>
+                    $earlyLeaveMinutes,
+
+                'work_minutes' =>
+                    $workMinutes,
+
+                'short_work_minutes' =>
+                    $shortWorkMinutes,
+
+                'forgot_check_in' =>
+                    $forgotCheckIn,
+
+                'forgot_check_out' =>
+                    $forgotCheckOut,
+
+                'is_idt' =>
+                    $isIdt,
+
+                'is_ipc' =>
+                    $isIpc,
+
+                'leave_request_id' =>
+                    $leaveRequest?->id,
+
+                'leave_type_id' =>
+                    $leaveRequest?->leave_type_id,
+
+                'status' =>
+                    $status,
                 'source' => $log->source,
+
                 'notes' => $log->notes,
-                'processed_at' => now()
+
+                'processed_at' =>
+                    now()
             ]
         );
     }
