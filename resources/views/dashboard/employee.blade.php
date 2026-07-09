@@ -3,6 +3,7 @@
 @section('title', 'Dashboard')
 
 @section('content')
+
     <div class="wrapper">
         <div class="page-content">
             <div class="container-xxl">
@@ -63,7 +64,28 @@
                     </div>
                 </div>
 
-                {{-- Statistics (Kembali ke Hitungan Status Pengajuan Awal) --}}
+                {{-- 🌟 FITUR BARU: Tabel Jadwal Kerja Saya (Statis & Read-Only) 🌟 --}}
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white py-3 border-bottom">
+                        <h4 class="card-title mb-1 fw-bold text-dark">
+                            <iconify-icon icon="solar:calendar-date-bold-duotone"
+                                class="align-middle me-1 text-primary fs-20"></iconify-icon>
+                            Jadwal Kerja Saya
+                        </h4>
+
+                    </div>
+                    <div class="card-body">
+
+                        <div class="row">
+                            <div class="col-xl-12">
+                                <div class="mt-4 mt-lg-0">
+                                    <div id="user-calendar"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {{-- Statistics (Hitungan Status Pengajuan Awal) --}}
                 <div class="row mb-4">
                     @php
                         $cards = [
@@ -96,7 +118,7 @@
                     @endforeach
                 </div>
 
-                {{-- Leave Table (Sama seperti show.blade) --}}
+                {{-- Leave Table (Rincian Kuota Cuti) --}}
                 <div class="card border-0 shadow-sm">
                     <div class="card-header bg-white py-3 border-bottom">
                         <h4 class="card-title mb-0 fw-bold text-dark">
@@ -130,7 +152,6 @@
                                                 ? min(100, round(($used / $quota) * 100))
                                                 : 0;
 
-                                            // Menentukan warna progress bar berdasarkan persentase
                                             $barColor = 'bg-primary';
                                             if ($percentage >= 80) {
                                                 $barColor = 'bg-danger';
@@ -142,7 +163,8 @@
                                             <td class="ps-4 fw-medium text-muted">{{ $index + 1 }}</td>
                                             <td>
                                                 <div class="fw-bold text-dark">
-                                                    {{ $allocation->leaveType?->name ?? 'Jenis Cuti N/A' }}</div>
+                                                    {{ $allocation->leaveType?->name ?? 'Jenis Cuti N/A' }}
+                                                </div>
                                             </td>
                                             <td class="text-center fw-semibold text-secondary">
                                                 {{ floatval($quota) }}
@@ -182,4 +204,51 @@
             </div>
         </div>
     </div>
+
+    @push('scripts')
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                var calendarEl = document.getElementById('user-calendar');
+
+                var calendar = new FullCalendar.Calendar(calendarEl, {
+                    tthemeSystem: 'bootstrap',
+                    initialView: 'dayGridMonth',
+                    firstDay: 1,
+
+                    // 🌟 UBAH / TAMBAHKAN BAGIAN INI 🌟
+                    buttonText: {
+                        today: 'Today',
+                        prev: 'Prev', // Memaksa menampilkan teks 'Prev' daripada ikon panah
+                        next: 'Next'  // Memaksa menampilkan teks 'Next' daripada ikon panah
+                    },
+
+                    headerToolbar: {
+                        left: 'prev,next today',
+                        center: 'title',
+                        right: ''
+                    },
+
+                    locale: 'id', // Memastikan bahasa Indonesia aktif
+                    height: 650,
+
+                    // Jalur mengambil data event dari Route API Laravel
+                    events: "{{ route('employee.schedule.events') }}",
+
+                    editable: false,   // Read-only (Mencegah drag-and-drop)
+                    selectable: false, // Read-only (Mencegah blok tanggal)
+
+                    // Mengatur style tampilan kotak jadwal agar rapi mengikuti badge Larkon
+                    eventDidMount: function (info) {
+                        info.el.style.whiteSpace = 'normal';
+                        info.el.style.borderRadius = '4px';
+                        info.el.style.padding = '4px 6px';
+                        info.el.style.border = 'none';
+                    }
+                });
+
+                // Menyalakan sistem kalendarnya
+                calendar.render();
+            });
+        </script>
+    @endpush
 @endsection

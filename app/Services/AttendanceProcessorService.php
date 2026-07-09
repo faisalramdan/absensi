@@ -15,112 +15,45 @@ class AttendanceProcessorService
         int $employeeId,
         string $date
     ) {
-
         $date = Carbon::parse($date);
+        $startDateStr = $date->format('Y-m-d');
 
         /*
         |--------------------------------------------------------------------------
-        | Holiday
+        | 1. Ambil Data Log Absensi Terlebih Dahulu
         |--------------------------------------------------------------------------
         */
-
-        $holiday = Holiday::whereDate(
-            'date_applied',
-            $date
-        )->first();
-
-        if ($holiday) {
-
-            return Attendance::updateOrCreate(
-                [
-                    'employee_id' => $employeeId,
-                    'date' => $date->format('Y-m-d')
-                ],
-                [
-                    'status' => 'holiday',
-
-                    'remarks' => $holiday->name,
-
-                    'source' => 'generated',
-
-                    'processed_at' => now()
-                ]
-            );
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Leave Request
-        |--------------------------------------------------------------------------
-        */
-
-        $leaveRequest = LeaveRequest::with(
-            'leaveType'
-        )
-            ->where(
-                'employee_id',
-                $employeeId
-            )
-            ->where(
-                'status',
-                'approved'
-            )
-            ->whereDate(
-                'start_date',
-                '<=',
-                $date
-            )
-            ->whereDate(
-                'end_date',
-                '>=',
-                $date
-            )
+        $log = AttendanceLog::where('employee_id', $employeeId)
+            ->whereDate('date', $date)
             ->first();
 
+        $hasLogData = $log && (!empty($log->check_in) || !empty($log->check_out));
+
         /*
         |--------------------------------------------------------------------------
-        | Leave Normal
+        | 2. Holiday Check
         |--------------------------------------------------------------------------
         */
+        $holiday = Holiday::whereDate('date_applied', $date)->first();
 
-        if ($leaveRequest) {
+        // Indikator apakah hari ini adalah hari libur nasional atau weekend/off
+        $isHariLiburAtauWeekend = false;
 
-            $leaveCode =
-                $leaveRequest
-                    ->leaveType
-                        ?->code;
+        if ($holiday) {
+            $isHariLiburAtauWeekend = true;
 
-            if (
-                !in_array(
-                    $leaveCode,
-                    [
-                        'I-IDT',
-                        'I-IPC'
-                    ]
-                )
-            ) {
-
-                $status =
-                    $leaveCode == 'I-SKT'
-                    ? 'sick'
-                    : 'leave';
-
+            // Jika hari libur NASIONAL tapi TIDAK ADA log absen, langsung set status 'holiday'
+            if (!$hasLogData) {
                 return Attendance::updateOrCreate(
                     [
                         'employee_id' => $employeeId,
-                        'date' => $date->format('Y-m-d')
+                        'date' => $startDateStr
                     ],
                     [
-                        'status' => $status,
-
-                        'leave_request_id' =>
-                            $leaveRequest->id,
-
-                        'leave_type_id' =>
-                            $leaveRequest->leave_type_id,
-
+                        'status' => 'holiday',
+                        'remarks' => $holiday->name,
+                        'is_wfa' => false,
                         'source' => 'generated',
-
                         'processed_at' => now()
                     ]
                 );
@@ -129,35 +62,59 @@ class AttendanceProcessorService
 
         /*
         |--------------------------------------------------------------------------
-        | Shift Assignment
+        | 3. Leave Request Check
         |--------------------------------------------------------------------------
         */
-
-        $assignment = ShiftAssignment::with(
-            'shift.details'
-        )
-            ->where(
-                'employee_id',
-                $employeeId
-            )
-            ->whereDate(
-                'date',
-                $date
-            )
+        $leaveRequest = LeaveRequest::with('leaveType')
+            ->where('employee_id', $employeeId)
+            ->where('status', 'approved')
+            ->whereDate('start_date', '<=', $date)
+            ->whereDate('end_date', '>=', $date)
             ->first();
 
-        if (!$assignment) {
+        if ($leaveRequest && !$hasLogData) {
+            $leaveCode = $leaveRequest->leaveType?->code;
 
+            if (!in_array($leaveCode, ['I-IDT', 'I-IPC'])) {
+                $status = $leaveCode == 'I-SKT' ? 'sick' : 'leave';
+
+                return Attendance::updateOrCreate(
+                    [
+                        'employee_id' => $employeeId,
+                        'date' => $startDateStr
+                    ],
+                    [
+                        'status' => $status,
+                        'leave_request_id' => $leaveRequest->id,
+                        'leave_type_id' => $leaveRequest->leave_type_id,
+                        'is_wfa' => false,
+                        'source' => 'generated',
+                        'processed_at' => now()
+                    ]
+                );
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 4. Shift Assignment Check
+        |--------------------------------------------------------------------------
+        */
+        $assignment = ShiftAssignment::with('shift.details')
+            ->where('employee_id', $employeeId)
+            ->whereDate('date', $date)
+            ->first();
+
+        if (!$assignment && !$hasLogData) {
             return Attendance::updateOrCreate(
                 [
                     'employee_id' => $employeeId,
-                    'date' => $date->format('Y-m-d')
+                    'date' => $startDateStr
                 ],
                 [
                     'status' => 'off',
-
+                    'is_wfa' => false,
                     'source' => 'generated',
-
                     'processed_at' => now()
                 ]
             );
@@ -165,50 +122,49 @@ class AttendanceProcessorService
 
         /*
         |--------------------------------------------------------------------------
-        | Shift Detail
+        | 5. Shift Detail Check
         |--------------------------------------------------------------------------
         */
-
         $dayName = $date->format('l');
+        $shiftDetail = $assignment ? $assignment->shift->details->where('day_name', $dayName)->first() : null;
 
-        $shiftDetail = $assignment
-            ->shift
-            ->details
-            ->where(
-                'day_name',
-                $dayName
-            )
-            ->first();
+        // Jika jadwalnya OFF atau tidak ditemukan jadwal resmi
+        if (!$shiftDetail || $shiftDetail->is_off) {
+            $isHariLiburAtauWeekend = true;
 
-        if (!$shiftDetail) {
-
-            return Attendance::updateOrCreate(
-                [
-                    'employee_id' => $employeeId,
-                    'date' => $date->format('Y-m-d')
-                ],
-                [
-                    'status' => 'off',
-
-                    'source' => 'generated',
-
-                    'processed_at' => now()
-                ]
-            );
+            // Jika TIDAK ADA log absen -> Tetap Set 'off'
+            if (!$hasLogData) {
+                return Attendance::updateOrCreate(
+                    [
+                        'employee_id' => $employeeId,
+                        'date' => $startDateStr
+                    ],
+                    [
+                        'status' => 'off',
+                        'is_wfa' => false,
+                        'source' => 'generated',
+                        'processed_at' => now()
+                    ]
+                );
+            }
         }
 
-        if ($shiftDetail->is_off) {
-
+        /*
+        |--------------------------------------------------------------------------
+        | 6. Jika Tanpa Log Absen Kerja -> Alpha
+        |--------------------------------------------------------------------------
+        */
+        if (!$log) {
             return Attendance::updateOrCreate(
                 [
                     'employee_id' => $employeeId,
-                    'date' => $date->format('Y-m-d')
+                    'date' => $startDateStr
                 ],
                 [
-                    'status' => 'off',
-
+                    'shift_id' => $assignment?->shift_id,
+                    'status' => 'alpha',
+                    'is_wfa' => false,
                     'source' => 'generated',
-
                     'processed_at' => now()
                 ]
             );
@@ -216,63 +172,45 @@ class AttendanceProcessorService
 
         /*
         |--------------------------------------------------------------------------
-        | Attendance Log
+        | 7. KARYAWAN MASUK (Proses Penentuan Jam Kerja & Status WFA)
         |--------------------------------------------------------------------------
         */
-
-        $log = AttendanceLog::where(
-            'employee_id',
-            $employeeId
-        )
-            ->whereDate(
-                'date',
-                $date
-            )
-            ->first();
-
-        if (!$log) {
-
-            return Attendance::updateOrCreate(
-                [
-                    'employee_id' => $employeeId,
-                    'date' => $date->format('Y-m-d')
-                ],
-                [
-                    'shift_id' => $assignment->shift_id,
-
-                    'status' => 'alpha',
-
-                    'source' => 'generated',
-
-                    'processed_at' => now()
-                ]
-            );
+        if (!$assignment || !$shiftDetail) {
+            $shiftDetail = (object) [
+                'start_time' => '08:00:00',
+                'end_time' => '17:00:00',
+                'late_deadline' => '08:00:00',
+                'is_off' => true
+            ];
         }
 
         return $this->processPresent(
+            $employeeId,
             $assignment,
             $shiftDetail,
             $log,
             $date,
-            $leaveRequest
+            $leaveRequest,
+            $isHariLiburAtauWeekend // Oper status libur/weekend ke fungsi hitung
         );
     }
 
     private function processPresent(
+        $employeeId,
         $assignment,
         $shiftDetail,
         $log,
         $date,
-        $leaveRequest = null
+        $leaveRequest = null,
+        $isHariLiburAtauWeekend = false
     ) {
         $startDateStr = $date->format('Y-m-d');
 
         /*
         |--------------------------------------------------------------------------
-        | Required Work Minutes (Otomatis Deteksi Hari Sabtu)
+        | Required Work Minutes
         |--------------------------------------------------------------------------
         */
-        // Jika hari Sabtu = 5 jam (300 menit), hari lainnya = 8 jam (480 menit)
         $isSaturday = $date->isSaturday();
         $requiredWorkMinutes = $isSaturday ? 300 : 480;
 
@@ -295,21 +233,17 @@ class AttendanceProcessorService
         */
         $shiftStart = Carbon::parse($startDateStr . ' ' . $shiftDetail->start_time);
         $lateDeadline = Carbon::parse($startDateStr . ' ' . $shiftDetail->late_deadline);
-
-        // Tentukan shiftEnd dasar bawaan database
         $shiftEnd = Carbon::parse($startDateStr . ' ' . $shiftDetail->end_time);
 
-        // Jika hari sabtu, override tampilan schedule default shiftEnd agar maju sesuai durasi 5 jam
         if ($isSaturday) {
             $shiftEnd = $shiftStart->copy()->addMinutes($requiredWorkMinutes);
         } elseif ($shiftEnd->lt($shiftStart)) {
-            // Proteksi jika shift dasar melewati tengah malam pada hari biasa
             $shiftEnd->addDay();
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Target Pulang Dinamis & Kunci Batas Jam Kerja (Support Sabtu)
+        | Target Pulang Dinamis & Kunci Batas Jam Kerja
         |--------------------------------------------------------------------------
         */
         $requiredCheckOut = null;
@@ -317,35 +251,25 @@ class AttendanceProcessorService
         if ($actualIn) {
             $actualInTime = $actualIn->format('H:i:s');
 
-            // A. KONDISI UNTUK SHIFT FLUID MIDNIGHT (Khusus aturan main 00:00 Anda)
             if ($shiftDetail->start_time === '00:00:00') {
-
-                // Jika Telat Parah (Lewat dari 01:00) -> Target pulang dikunci (Hari biasa jam 09:00, Sabtu jam 06:00)
                 if ($actualInTime > $shiftDetail->late_deadline && $actualInTime < '12:00:00') {
                     $targetTime = $isSaturday ? '06:00:00' : '09:00:00';
                     $requiredCheckOut = Carbon::parse($startDateStr . ' ' . $targetTime);
                     $shiftEnd = Carbon::parse($startDateStr . ' ' . $targetTime);
                 } else {
-                    // Masuk Normal -> Target pulang = Jam Masuk + Durasi Wajib (Sabtu 5 jam, Biasa 8 jam)
                     $requiredCheckOut = $actualIn->copy()->addMinutes($requiredWorkMinutes);
                     $targetEnd = $isSaturday ? '05:00:00' : '08:00:00';
                     $shiftEnd = Carbon::parse($startDateStr . ' ' . $targetEnd);
                 }
-
-            }
-            // B. KONDISI UNTUK SHIFT SORE ATAU SHIFT LAINNYA
-            else {
-                // Jika masuk normal sebelum batas telat -> Pulang adil (Jam Masuk + Durasi Wajib)
+            } else {
                 if ($actualInTime <= $shiftDetail->late_deadline) {
                     $requiredCheckOut = $actualIn->copy()->addMinutes($requiredWorkMinutes);
                 } else {
-                    // Jika telat, target pulang dikunci berdasarkan base schedule + kompensasi menit telatnya
                     $lateDiff = $lateDeadline->diffInMinutes($actualIn);
                     $requiredCheckOut = $shiftEnd->copy()->addMinutes($lateDiff);
                 }
             }
         } else {
-            // Fallback jika lupa absen masuk
             $requiredCheckOut = $shiftEnd->copy();
         }
 
@@ -356,8 +280,6 @@ class AttendanceProcessorService
         */
         if (!empty($log->check_out)) {
             $actualOut = Carbon::parse($startDateStr . ' ' . $log->check_out);
-
-            // Pengecekan overlap universal jika melewati tengah malam (terutama shift sore/malam)
             if ($actualIn && $actualOut->lt($actualIn)) {
                 $actualOut->addDay();
             }
@@ -368,16 +290,13 @@ class AttendanceProcessorService
 
         /*
         |--------------------------------------------------------------------------
-        | Perhitungan Keterlambatan (Universal)
+        | Perhitungan Keterlambatan
         |--------------------------------------------------------------------------
         */
         $lateMinutes = 0;
-
         if ($actualIn) {
             $actualInTimeStr = $actualIn->format('H:i:s');
-
             if ($actualInTimeStr > $shiftDetail->late_deadline) {
-                // Filter khusus Shift 00:00 agar tidak terbentur jam 23:xx malam sebelumnya
                 if ($shiftDetail->start_time === '00:00:00' && $actualInTimeStr >= '23:00:00') {
                     $lateMinutes = 0;
                 } else {
@@ -416,7 +335,7 @@ class AttendanceProcessorService
 
         /*
         |--------------------------------------------------------------------------
-        | IDT / IPC Identification & Save Status
+        | IDT / IPC Identification
         |--------------------------------------------------------------------------
         */
         $isIdt = false;
@@ -427,15 +346,30 @@ class AttendanceProcessorService
             $isIpc = $code === 'I-IPC';
         }
 
-        $status = 'present';
+        /*
+        |--------------------------------------------------------------------------
+        | ATURAN BARU: Penentuan Status & Identitas is_wfa
+        |--------------------------------------------------------------------------
+        */
+        $apakahWeekendAtauLibur = $isHariLiburAtauWeekend || $date->isSunday();
+
+        if ($apakahWeekendAtauLibur) {
+            $status = 'wfa';
+            $isWfa = true;
+        } else {
+            $status = 'present';
+            $isWfa = false;
+        }
+
+        $finalShiftId = $assignment ? $assignment->shift_id : 1;
 
         return Attendance::updateOrCreate(
             [
-                'employee_id' => $assignment->employee_id,
+                'employee_id' => $employeeId,
                 'date' => $startDateStr
             ],
             [
-                'shift_id' => $assignment->shift_id,
+                'shift_id' => $finalShiftId,
                 'scheduled_check_in' => $shiftDetail->start_time,
                 'scheduled_check_out' => $shiftEnd->format('H:i:s'),
                 'actual_check_in' => $log->check_in,
@@ -448,9 +382,10 @@ class AttendanceProcessorService
                 'forgot_check_out' => $forgotCheckOut,
                 'is_idt' => $isIdt,
                 'is_ipc' => $isIpc,
+                'is_wfa' => $isWfa, // Menyimpan identitas is_wfa ke database
                 'leave_request_id' => $leaveRequest?->id,
                 'leave_type_id' => $leaveRequest?->leave_type_id,
-                'status' => $status,
+                'status' => $status, // Berisi 'wfa' jika masuk di hari libur/weekend, atau 'present' di hari kerja biasa
                 'source' => $log->source,
                 'notes' => $log->notes,
                 'processed_at' => now()

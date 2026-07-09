@@ -25,7 +25,7 @@ class ShiftAssignmentController extends Controller
         $chosenMonth = $request->input('month', date('m'));
         $chosenYear = $request->input('year', date('Y'));
 
-        // Periode cut-off (26 Bulan Lalu s/d 25 Bulan Ini)
+        // Jika pilih Juni, maka Start = 26 Mei, End = 25 Juni
         $startDate = Carbon::create($chosenYear, $chosenMonth, 26)->subMonth();
         $endDate = Carbon::create($chosenYear, $chosenMonth, 25);
 
@@ -38,35 +38,25 @@ class ShiftAssignmentController extends Controller
 
         $shifts = Shift::all();
 
-        // Ambil data master hari libur
+        // --- TAMBAHAN: Ambil data master hari libur di periode cut-off ini ---
         $holidays = Holiday::whereBetween('date_applied', [
             $startDate->startOfDay()->toDateTimeString(),
             $endDate->endOfDay()->toDateTimeString()
         ])
-            ->pluck('name', 'date_applied')
+            ->pluck('name', 'date_applied') // Hasilnya: ['2026-06-01' => 'Hari Lahir Pancasila']
             ->toArray();
 
-        // 🌟 1. Ambil SEMUA karyawan aktif untuk kebutuhan list Dropdown di View
-        $allActiveEmployees = Employee::where('is_active', true)
-            ->orderBy('full_name', 'asc')
-            ->get();
-
-        // 🌟 2. Filter karyawan yang akan TAMPIL di tabel matriks
-        $selectedEmployeeId = $request->input('employee_id'); // Mengambil id dari dropdown
-
-        $employees = Employee::where('is_active', true)
-            ->when($selectedEmployeeId, function ($query) use ($selectedEmployeeId) {
-                $query->where('id', $selectedEmployeeId);
+        // Ambil data karyawan dan FILTER HANYA YANG AKTIF (`is_active` = true)
+        $search = $request->input('search');
+        $employees = Employee::where('is_active', true) // 🌟 Perubahan di sini: Hanya memunculkan karyawan aktif
+            ->when($search, function ($query) use ($search) {
+                $query->where('full_name', 'like', '%' . $search . '%');
             })
             ->orderBy('full_name', 'asc')
             ->get();
 
-        // Ambil ID Karyawan yang lolos filter untuk membatasi kueri assignments
-        $employeeIds = $employees->pluck('id')->toArray();
-
-        // Saring data penugasan hanya untuk karyawan yang sedang tampil
+        // Ambil data penugasan berdasarkan rentang tanggal dinamis
         $assignments = ShiftAssignment::with('shift')
-            ->whereIn('employee_id', $employeeIds)
             ->whereBetween('date', [
                 $startDate->startOfDay()->toDateTimeString(),
                 $endDate->endOfDay()->toDateTimeString()
@@ -80,24 +70,12 @@ class ShiftAssignmentController extends Controller
             $empId = $assignment->employee_id;
 
             if ($empId) {
-                $assignmentsData[$empId][$formattedDate] = [
-                    'shift_id' => $assignment->shift_id,
-                    'shift_name' => $assignment->shift->name ?? '-'
-                ];
+                $assignmentsData[$empId][$formattedDate] = $assignment->shift->name ?? '-';
             }
         }
 
-        // 🌟 Kirim variabel $allActiveEmployees ke View
-        return view('assignments.index', compact(
-            'employees',
-            'allActiveEmployees',
-            'dates',
-            'shifts',
-            'assignmentsData',
-            'startDate',
-            'endDate',
-            'holidays'
-        ));
+        // Tambahkan 'holidays' ke dalam compact
+        return view('assignments.index', compact('employees', 'dates', 'shifts', 'assignmentsData', 'startDate', 'endDate', 'holidays'));
     }
 
     /**
@@ -123,73 +101,70 @@ class ShiftAssignmentController extends Controller
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
             'notes' => 'nullable|string|max:255',
-            // Tambahkan validasi untuk settingan baru (opsional, default ke boolean)
-            'include_sunday' => 'nullable|boolean',
-            'include_holiday' => 'nullable|boolean',
         ]);
 
         $createdBy = Auth::user()->employee?->id ?? null;
+
         $period = CarbonPeriod::create($request->start_date, $request->end_date);
         $shift = Shift::findOrFail($request->shift_id);
 
-        // Ambil data libur HANYA jika user memilih untuk MELEWATI hari libur (include_holiday tidak dicentang)
-        $holidays = [];
-        if (!$request->has('include_holiday')) {
-            $holidays = Holiday::whereBetween('date_applied', [$request->start_date, $request->end_date])
-                ->pluck('name', 'date_applied')
-                ->toArray();
-        }
+        // 2. AMBIL SEMUA TANGGAL LIBUR YANG BERADA DI DALAM RENTANG TANGGAL INPUT
+        $holidays = Holiday::whereBetween('date_applied', [$request->start_date, $request->end_date])
+            ->pluck('name', 'date_applied') // Mengambil array [ 'YYYY-MM-DD' => 'Nama Libur' ]
+            ->toArray();
 
         try {
             DB::beginTransaction();
-
-            $upsertData = [];
 
             foreach ($request->employee_ids as $employeeId) {
                 foreach ($period as $date) {
                     $formattedDate = $date->format('Y-m-d');
 
-                    // KONDISI DINAMIS 1: Jika HARI MINGGU dan user TIDAK mencentang "include_sunday", maka SKIP
-                    if ($date->isSunday() && !$request->has('include_sunday')) {
+                    // KUNCI UTAMA 1: Jika hari tersebut adalah hari Minggu, langsung lewati
+                    if ($date->isSunday()) {
                         continue;
                     }
 
-                    // KONDISI DINAMIS 2: Jika HARI LIBUR dan user TIDAK mencentang "include_holiday", maka SKIP
-                    if (!$request->has('include_holiday') && array_key_exists($formattedDate, $holidays)) {
+                    // KUNCI UTAMA 2: SAMBUNGAN MASTER HARI LIBUR
+                    // Jika tanggal ini terdaftar di tabel master holiday (date_applied), otomatis dilewati
+                    if (array_key_exists($formattedDate, $holidays)) {
                         continue;
                     }
 
-                    $upsertData[] = [
-                        'employee_id' => $employeeId,
-                        'date' => $formattedDate,
-                        'shift_id' => $request->shift_id,
-                        'notes' => $request->notes,
-                        'created_by' => $createdBy,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ];
+                    ShiftAssignment::updateOrCreate(
+                        [
+                            'employee_id' => $employeeId,
+                            'date' => $formattedDate,
+                        ],
+                        [
+                            'shift_id' => $request->shift_id,
+                            'notes' => $request->notes,
+                            'created_by' => $createdBy,
+                        ]
+                    );
                 }
             }
 
-            if (!empty($upsertData)) {
-                ShiftAssignment::upsert(
-                    $upsertData,
-                    ['employee_id', 'date'],
-                    ['shift_id', 'notes', 'created_by', 'updated_at']
-                );
-            }
-
-            // Catat di log sesuai dengan settingan yang dipilih user
+            // --- PERBAIKAN LOG AKTIVITAS (Menambahkan info Libur Nasional) ---
             ActivityLogger::log(
                 'ShiftAssignment',
                 'Create',
-                'Menambahkan jadwal massal shift "' . $shift->name . '" dengan opsi dinamis (Minggu: ' . ($request->has('include_sunday') ? 'Masuk' : 'Lewati') . ', Libur: ' . ($request->has('include_holiday') ? 'Masuk' : 'Lewati') . ').',
+                'Menambahkan jadwal massal shift "' . $shift->name . '" untuk ' . count($request->employee_ids) . ' karyawan. (Hari Minggu & Hari Libur Nasional otomatis dilewati)',
                 [],
-                $request->all()
+                [
+                    'shift_name' => $shift->name,
+                    'start_date' => $request->start_date,
+                    'end_date' => $request->end_date,
+                    'total_employees' => count($request->employee_ids),
+                    'employee_ids' => $request->employee_ids,
+                    'holidays_skipped' => $holidays, // Mencatat hari libur apa saja yang dilewati pada log
+                    'notes' => $request->notes
+                ]
             );
+            // --- END LOG ---
 
             DB::commit();
-            return redirect()->route('assignments.index')->with('success', 'Penjadwalan massal berhasil disimpan sesuai pengaturan yang dipilih!');
+            return redirect()->route('assignments.index')->with('success', 'Penjadwalan massal karyawan berhasil disimpan! Hari Minggu dan Hari Libur Nasional otomatis dilewati.');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -244,63 +219,6 @@ class ShiftAssignmentController extends Controller
 
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
-        }
-    }
-
-    /**
-     * 🌟 METHOD BARU: Menyimpan perubahan live edit dari AJAX matriks (perubahan shift)
-     */
-    public function updateInline(Request $request)
-    {
-        $request->validate([
-            'employee_id' => 'required|exists:employees,id',
-            'date' => 'required|date',
-            'shift_id' => 'nullable|exists:shifts,id', // Nullable jika direset ke "-"
-        ]);
-
-        $createdBy = Auth::user()->employee?->id ?? null;
-
-        try {
-            DB::beginTransaction();
-
-            // Skenario 1: Jika user memilih opsi "-" (Kosong), hapus baris jadwal tersebut
-            if (empty($request->shift_id)) {
-                ShiftAssignment::where('employee_id', $request->employee_id)
-                    ->where('date', $request->date)
-                    ->delete();
-
-                DB::commit();
-                return response()->json([
-                    'status' => 'success',
-                    'message' => 'Jadwal berhasil dihapus'
-                ]);
-            }
-
-            // Skenario 2: Jika memilih shift tertentu, simpan atau update data (Upsert)
-            ShiftAssignment::updateOrCreate(
-                [
-                    'employee_id' => $request->employee_id,
-                    'date' => $request->date,
-                ],
-                [
-                    'shift_id' => $request->shift_id,
-                    'created_by' => $createdBy,
-                    'updated_at' => now(),
-                ]
-            );
-
-            DB::commit();
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Jadwal berhasil diperbarui'
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Gagal mengubah jadwal: ' . $e->getMessage()
-            ], 500);
         }
     }
 }

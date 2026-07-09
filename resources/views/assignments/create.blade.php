@@ -95,6 +95,33 @@
                                                 required>
                                         </div>
 
+
+
+                                        <div class="col-md-12">
+                                            <label class="form-label fw-semibold d-block mb-2">Pengecualian Hari
+                                                Libur</label>
+
+                                            <div class="form-check form-check-inline me-4">
+                                                <input class="form-check-input" type="checkbox" name="include_sunday"
+                                                    value="1" id="includeSunday" {{ old('include_sunday') ? 'checked' : '' }}>
+                                                <label class="form-check-label text-dark" for="includeSunday">
+                                                    Tetap masukkan jadwal pada hari <span
+                                                        class="badge bg-light text-danger fw-medium">Minggu</span>
+                                                </label>
+                                            </div>
+
+                                            <div class="form-check form-check-inline">
+                                                <input class="form-check-input" type="checkbox" name="include_holiday"
+                                                    value="1" id="includeHoliday" {{ old('include_holiday') ? 'checked' : '' }}>
+                                                <label class="form-check-label text-dark" for="includeHoliday">
+                                                    Tetap masukkan jadwal pada hari <span
+                                                        class="badge bg-light text-danger fw-medium">Libur Nasional</span>
+                                                </label>
+                                            </div>
+                                            <small class="text-muted d-block mt-1 fs-12">Jika tidak dicentang, sistem secara
+                                                otomatis akan melewati (skip) hari tersebut.</small>
+                                        </div>
+
                                         <div class="col-md-12">
                                             <label class="form-label fw-semibold">Catatan / Keterangan Jadwal <span
                                                     class="text-muted small">(Opsional)</span></label>

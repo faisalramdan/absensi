@@ -8,7 +8,6 @@ use App\Models\Employee;
 use App\Models\Attendance;
 use App\Models\Holiday;
 
-
 class AttendanceMonthlyController extends Controller
 {
     public function index(Request $request)
@@ -23,22 +22,27 @@ class AttendanceMonthlyController extends Controller
         | Periode Default (Cut-off 26 - 25)
         |--------------------------------------------------------------------------
         */
-        $selectedYear = $request->input('year', now()->year);
-        $selectedMonth = $request->input('month', now()->format('m'));
+        $selectedYear = $request->get('year', date('Y'));
+        $selectedMonth = $request->get('month', date('m'));
 
-        // Membuat acuan tanggal awal bulan terpilih
-        $target = Carbon::create($selectedYear, $selectedMonth, 1);
+        // Membuat objek Carbon berdasarkan tahun dan bulan yang dipilih (set tanggal ke 1)
+        $targetDate = Carbon::createFromDate($selectedYear, $selectedMonth, 1);
 
-        // Rentang default jika tidak ada input: tanggal 26 bulan lalu s.d 25 bulan ini
-        $startDate = $request->input(
-            'start_date',
-            $target->copy()->subMonth()->day(26)->format('Y-m-d')
-        );
+        // Default mulai: Tanggal 26 dari 1 bulan sebelum bulan yang dipilih
+        $defaultStart = $targetDate
+            ->copy()
+            ->subMonth()
+            ->day(26)
+            ->format('Y-m-d');
 
-        $endDate = $request->input(
-            'end_date',
-            $target->copy()->day(25)->format('Y-m-d')
-        );
+        // Default akhir: Tanggal 25 pada bulan yang dipilih
+        $defaultEnd = $targetDate
+            ->copy()
+            ->day(25)
+            ->format('Y-m-d');
+
+        $startDate = $request->get('start_date', $defaultStart);
+        $endDate = $request->get('end_date', $defaultEnd);
 
         /*
         |--------------------------------------------------------------------------
@@ -49,13 +53,7 @@ class AttendanceMonthlyController extends Controller
             'employee',
             'leaveType'
         ])
-            // Melakukan Join ke tabel karyawan untuk memastikan hanya mengambil karyawan aktif & urutan nama yang valid
-            ->join(
-                'employees',
-                'employees.id',
-                '=',
-                'attendances.employee_id'
-            )
+            ->join('employees', 'employees.id', '=', 'attendances.employee_id')
             ->where('employees.is_active', true)
             ->whereBetween('attendances.date', [$startDate, $endDate])
             ->orderBy('employees.full_name', 'asc')
@@ -77,132 +75,106 @@ class AttendanceMonthlyController extends Controller
         $summary = $rows
             ->groupBy('employee_id')
             ->map(function ($items) {
-
-                // Ambil data profil karyawan dari baris pertama barisan data group
+                // Ambil data profil karyawan
                 $employee = $items->first()->employee;
 
                 return [
                     'employee' => $employee,
 
                     // Menghitung hari hadir regular
-                    'present' => $items
-                        ->where('status', 'present')
-                        ->count(),
+                    'present' => $items->where('status', 'present')->count(),
+
+                    // Menghitung hari WFA sesuai standar tabel harian (status = 'wfa')
+                    'wfa' => $items->where('status', 'wfa')->count(),
 
                     // Menghitung hari Alpha (Mangkir)
-                    'alpha' => $items
-                        ->where('status', 'alpha')
-                        ->count(),
+                    'alpha' => $items->where('status', 'alpha')->count(),
 
                     // 1. SAKIT: Status leave, tag izin, dan ada unsur kata 'sakit' di nama tipenya
-                    'sick' => $items
-                        ->filter(function ($row) {
-                            return $row->status == 'leave'
-                                && optional($row->leaveType)->tag == 'izin'
-                                && str_contains(strtolower(optional($row->leaveType)->name), 'sakit');
-                        })
-                        ->count(),
+                    'sick' => $items->filter(function ($row) {
+                        return $row->status == 'sick'
+                            && optional($row->leaveType)->tag == 'izin'
+                            && str_contains(strtolower(optional($row->leaveType)->name), 'sakit');
+                    })->count(),
 
                     // 2. IZIN: Status leave, tag izin, tapi BUKAN izin sakit
-                    'permission' => $items
-                        ->filter(function ($row) {
-                            return $row->status == 'leave'
-                                && optional($row->leaveType)->tag == 'izin'
-                                && !str_contains(strtolower(optional($row->leaveType)->name), 'sakit');
-                        })
-                        ->count(),
+                    'permission' => $items->filter(function ($row) {
+                        return $row->status == 'leave'
+                            && optional($row->leaveType)->tag == 'izin'
+                            && !str_contains(strtolower(optional($row->leaveType)->name), 'sakit');
+                    })->count(),
 
                     // 3. CUTI: Status leave dan memiliki tag murni 'cuti'
-                    'annual_leave' => $items
-                        ->filter(function ($row) {
-                            return $row->status == 'leave'
-                                && optional($row->leaveType)->tag == 'cuti';
-                        })
-                        ->count(),
+                    'annual_leave' => $items->filter(function ($row) {
+                        return $row->status == 'leave'
+                            && optional($row->leaveType)->tag == 'cuti';
+                    })->count(),
 
-                    // Menghitung total WFA jika ada tag 'wfa'
-                    'wfa' => $items
-                        ->filter(function ($row) {
-                            return $row->status == 'leave'
-                                && optional($row->leaveType)->tag == 'wfa';
-                        })
-                        ->count(),
-
-                    // Menghitung total Libur Nasional
-                    'holiday' => $items
-                        ->where('status', 'holiday')
-                        ->count(),
-
-                    // Menghitung total libur regular (Off Sched)
-                    'off' => $items
-                        ->where('status', 'off')
-                        ->count(),
+                    // Menghitung total Libur Nasional & Off regular
+                    'holiday' => $items->where('status', 'holiday')->count(),
+                    'off' => $items->where('status', 'off')->count(),
 
                     // ATURAN LATE: Menit > 0 dan kolom toleransi (is_idt) TIDAK bernilai true/1
-                    'late' => $items
-                        ->filter(function ($row) {
-                            return $row->late_minutes > 0 && $row->is_idt != true;
-                        })
-                        ->count(),
+                    'late' => $items->filter(function ($row) {
+                        return $row->late_minutes > 0 && $row->is_idt != true;
+                    })->count(),
 
                     // ATURAN MENIT LATE: Hanya menjumlahkan menit yang tidak terkena toleransi is_idt
-                    'late_minutes' => $items
-                        ->filter(function ($row) {
-                            return $row->is_idt != true;
-                        })
-                        ->sum('late_minutes'),
+                    'late_minutes' => $items->filter(function ($row) {
+                        return $row->is_idt != true;
+                    })->sum('late_minutes'),
 
                     // ATURAN EARLY LEAVE: Menit > 0 dan kolom toleransi (is_ipc) TIDAK bernilai true/1
-                    'early_leave' => $items
-                        ->filter(function ($row) {
-                            return $row->early_leave_minutes > 0 && $row->is_ipc != true;
-                        })
-                        ->count(),
+                    'early_leave' => $items->filter(function ($row) {
+                        return $row->early_leave_minutes > 0 && $row->is_ipc != true;
+                    })->count(),
 
                     // ATURAN MENIT EARLY LEAVE: Hanya menjumlahkan menit yang tidak terkena toleransi is_ipc
-                    'early_leave_minutes' => $items
-                        ->filter(function ($row) {
-                            return $row->is_ipc != true;
-                        })
-                        ->sum('early_leave_minutes'),
+                    'early_leave_minutes' => $items->filter(function ($row) {
+                        return $row->is_ipc != true;
+                    })->sum('early_leave_minutes'),
 
-                    // Menghitung kasus Lupa Absen Masuk
-                    'forgot_in' => $items
-                        ->where('forgot_check_in', true)
-                        ->count(),
+                    // Menghitung kasus Lupa Absen Masuk & Keluar
+                    'forgot_in' => $items->where('forgot_check_in', true)->count(),
+                    'forgot_out' => $items->where('forgot_check_out', true)->count(),
 
-                    // Menghitung kasus Lupa Absen Keluar
-                    'forgot_out' => $items
-                        ->where('forgot_check_out', true)
-                        ->count(),
-
-                    // Menghitung penanda khusus Izin Pulang Cepat (IPC) murni
-                    'ipc' => $items
-                        ->where('is_ipc', true)
-                        ->count(),
-
-                    // Menghitung penanda khusus Izin Datang Terlambat (IDT) murni
-                    'idt' => $items
-                        ->where('is_idt', true)
-                        ->count(),
+                    // Menghitung penanda khusus Izin Pulang Cepat (IPC) & Terlambat (IDT) murni
+                    'ipc' => $items->where('is_ipc', true)->count(),
+                    'idt' => $items->where('is_idt', true)->count(),
 
                     // Total durasi menit kerja
-                    'work_minutes' => $items
-                        ->sum('work_minutes'),
+                    'work_minutes' => $items->where('status', 'present')->sum('work_minutes'),
 
                     // Total kekurangan Hari Kerja (diambil dari total Alpha)
-                    'kurang_hk' => $items
-                        ->where('status', 'alpha')
-                        ->count(),
+                    'kurang_hk' => $items->where('status', 'alpha')->count(),
 
-                    // Kalkulasi akumulasi total kekurangan jam kerja dalam satuan menit
-                    'kurang_jam' => max(
-                        0,
-                        ($items->where('status', 'present')->count() * 480) - $items->sum('work_minutes')
-                    ),
+                    // 🔥 FIX AKURAT: Gunakan perbandingan nilai integer murni dari model attribute 
+                    'short_work_count' => $items->filter(function ($item) {
+                        $shortMinutes = (int) ($item->short_work_minutes ?? 0);
+                        $isIdt = filter_var($item->is_idt, FILTER_VALIDATE_BOOLEAN);
+                        $isIpc = filter_var($item->is_ipc, FILTER_VALIDATE_BOOLEAN);
+
+                        return $shortMinutes > 0
+                            && !in_array($item->status, ['wfa', 'holiday', 'off'])
+                            && !$isIdt
+                            && !$isIpc;
+                    })->count(),
+
+                    // 🔥 FIX AKURAT: Jumlahkan total menit dengan memetakan datanya ke bentuk int terlebih dahulu
+                    'kurang_jam' => $items->filter(function ($item) {
+                        $shortMinutes = (int) ($item->short_work_minutes ?? 0);
+                        $isIdt = filter_var($item->is_idt, FILTER_VALIDATE_BOOLEAN);
+                        $isIpc = filter_var($item->is_ipc, FILTER_VALIDATE_BOOLEAN);
+
+                        return $shortMinutes > 0
+                            && !in_array($item->status, ['wfa', 'holiday', 'off'])
+                            && !$isIdt
+                            && !$isIpc;
+                    })->sum(function ($item) {
+                        return (int) $item->short_work_minutes;
+                    }),
                 ];
             })
-            // Mengurutkan kembali hasil summary berdasarkan nama lengkap karyawan secara natural (A-Z)
             ->sortBy(function ($item) {
                 return $item['employee']->full_name;
             }, SORT_NATURAL | SORT_FLAG_CASE)
@@ -213,13 +185,18 @@ class AttendanceMonthlyController extends Controller
         | Pembuatan Data Atas (Seksi Card Dasbor)
         |--------------------------------------------------------------------------
         */
-        // 1. Hitung total menit keterlambatan & pulang cepat dari seluruh karyawan
+        /*
+        |--------------------------------------------------------------------------
+        | Pembuatan Data Atas (Seksi Card Dasbor)
+        |--------------------------------------------------------------------------
+        */
         $totalLateMinutes = $summary->sum('late_minutes');
         $totalEarlyLeaveMinutes = $summary->sum('early_leave_minutes');
 
         $cards = [
             'employee' => $summary->count(),
             'present' => $summary->sum('present'),
+            'wfa' => $summary->sum('wfa'),
             'alpha' => $summary->sum('alpha'),
             'cuti' => $summary->sum('annual_leave'),
             'izin' => $summary->sum('permission'),
@@ -231,15 +208,23 @@ class AttendanceMonthlyController extends Controller
             'idt' => $summary->sum('idt'),
             'ipc' => $summary->sum('ipc'),
             'kurang_hk' => $summary->sum('kurang_hk'),
-            'kurang_jam' => $summary->sum('kurang_jam'),
 
-            // Data Perbaikan Keterlambatan Global
+            // 🔥 FIX: Paksa penjumlahan menggunakan callback array untuk Card Dasbor
+            'kurang_jam' => $summary->sum(function ($row) {
+                return (int) ($row['kurang_jam'] ?? 0);
+            }),
+
+            'short_work_count' => $summary->sum(function ($row) {
+                return (int) ($row['short_work_count'] ?? 0);
+            }),
+
+            // Data Keterlambatan Global
             'late' => $summary->sum('late'),
             'total_late_minutes' => $totalLateMinutes,
             'late_hours' => floor($totalLateMinutes / 60),
             'late_minutes_remainder' => $totalLateMinutes % 60,
 
-            // Data Perbaikan Pulang Cepat Global (Sudah diperbaiki dari sum('late') ke sum('early_leave'))
+            // Data Pulang Cepat Global
             'early_leave' => $summary->sum('early_leave'),
             'total_early_leave_minutes' => $totalEarlyLeaveMinutes,
             'early_leave_hours' => floor($totalEarlyLeaveMinutes / 60),
@@ -248,47 +233,43 @@ class AttendanceMonthlyController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Kalkulasi Kalender Kerja Efektif
+        | Hari Kerja (Kalender Otomatis - Sesuai Dengan Logika Daily)
         |--------------------------------------------------------------------------
         */
-        $start = Carbon::parse($startDate);
-        $end = Carbon::parse($endDate);
-
-        $calendarDays = $start->diffInDays($end) + 1;
+        $workingDays = 0;
         $sundayCount = 0;
-        $current = $start->copy();
+        $holidayCount = 0;
 
-        // Loop penentuan jumlah hari Minggu di dalam range periode aktif
-        while ($current->lte($end)) {
-            if ($current->isSunday()) {
+        $calendarDays = Carbon::parse($startDate)->diffInDays(Carbon::parse($endDate)) + 1;
+        $current = Carbon::parse($startDate);
+
+        while ($current->lte(Carbon::parse($endDate))) {
+            if ($current->dayOfWeek == Carbon::SUNDAY) {
                 $sundayCount++;
+            } else {
+                $holiday = Holiday::whereDate('date_applied', $current)->exists();
+                if ($holiday) {
+                    $holidayCount++;
+                } else {
+                    $workingDays++;
+                }
             }
             $current->addDay();
         }
 
-        // Mengambil total libur nasional dari tabel master Holiday dalam range tanggal terpilih
-        $holidayCount = Holiday::whereBetween('date_applied', [$startDate, $endDate])->count();
-
-        // Rumus penentuan sisa hari kerja efektif perusahaan
-        $workingDays = $calendarDays - $sundayCount - $holidayCount;
-
-        // Mengirimkan seluruh variabel siap pakai ke dalam View Monthly-Attendance
-        return view(
-            'attendance-monthly.index',
-            compact(
-                'summary',
-                'cards',
-                'employees',
-                'selectedYear',
-                'selectedMonth',
-                'startDate',
-                'endDate',
-                'workingDays',
-                'calendarDays',
-                'sundayCount',
-                'holidayCount'
-            )
-        );
+        return view('attendance-monthly.index', compact(
+            'summary',
+            'cards',
+            'employees',
+            'selectedYear',
+            'selectedMonth',
+            'startDate',
+            'endDate',
+            'workingDays',
+            'calendarDays',
+            'sundayCount',
+            'holidayCount'
+        ));
     }
 
     public function show(Request $request, Employee $employee)
@@ -297,80 +278,54 @@ class AttendanceMonthlyController extends Controller
         $endDate = $request->end_date;
 
         if (!$startDate || !$endDate) {
-
             return redirect()
                 ->route('attendance-monthly.index')
                 ->with('error', 'Periode tidak ditemukan.');
-
         }
 
-        $attendances = Attendance::with([
-            'shift',
-            'leaveType'
-        ])
+        $attendances = Attendance::with(['shift', 'leaveType'])
             ->where('employee_id', $employee->id)
-            ->whereBetween('date', [
-                $startDate,
-                $endDate
-            ])
+            ->whereBetween('date', [$startDate, $endDate])
             ->orderBy('date', 'desc')
             ->get();
 
         $summary = [
-
             'present' => $attendances->where('status', 'present')->count(),
-
-            'late' => $attendances->where('late_minutes', '>', 0)->count(),
-
+            'wfa' => $attendances->where('status', 'wfa')->count(),
             'alpha' => $attendances->where('status', 'alpha')->count(),
-
             'holiday' => $attendances->where('status', 'holiday')->count(),
-
             'off' => $attendances->where('status', 'off')->count(),
-
             'forgot_in' => $attendances->where('forgot_check_in', true)->count(),
-
             'forgot_out' => $attendances->where('forgot_check_out', true)->count(),
-
             'idt' => $attendances->where('is_idt', true)->count(),
-
             'ipc' => $attendances->where('is_ipc', true)->count(),
-
-            'cuti' => $attendances
-                ->filter(function ($row) {
-
-                    return $row->status == 'leave'
-                        && optional($row->leaveType)->tag == 'cuti';
-
-                })
-                ->count(),
-
-            'izin' => $attendances
-                ->filter(function ($row) {
-
-                    return $row->status == 'leave'
-                        && optional($row->leaveType)->tag == 'izin';
-
-                })
-                ->count(),
-
-            'work_minutes' => $attendances->sum('work_minutes'),
-
-            'late_minutes' => $attendances->sum('late_minutes'),
-
-            'early_leave_minutes' => $attendances->sum('early_leave_minutes'),
-
+            'cuti' => $attendances->filter(function ($row) {
+                return $row->status == 'leave' && optional($row->leaveType)->tag == 'cuti';
+            })->count(),
+            'izin' => $attendances->filter(function ($row) {
+                return $row->status == 'leave' && optional($row->leaveType)->tag == 'izin';
+            })->count(),
+            'work_minutes' => $attendances->where('status', 'present')->sum('work_minutes'),
+            'late_minutes' => $attendances->filter(function ($row) {
+                return $row->is_idt != true;
+            })->sum('late_minutes'),
+            'early_leave_minutes' => $attendances->filter(function ($row) {
+                return $row->is_ipc != true;
+            })->sum('early_leave_minutes'),
+            'short_work_count' => $attendances->filter(function ($row) {
+                return $row->short_work_minutes > 0
+                    && !in_array($row->status, ['wfa', 'holiday', 'off'])
+                    && $row->is_idt != true
+                    && $row->is_ipc != true;
+            })->count(),
+            'total_short_work_minutes' => $attendances->filter(function ($row) {
+                return $row->short_work_minutes > 0
+                    && !in_array($row->status, ['wfa', 'holiday', 'off'])
+                    && $row->is_idt != true
+                    && $row->is_ipc != true;
+            })->sum('short_work_minutes'),
         ];
 
-        return view(
-            'attendance-monthly.show',
-            compact(
-                'employee',
-                'attendances',
-                'summary',
-                'startDate',
-                'endDate'
-            )
-        );
+        return view('attendance-monthly.show', compact('employee', 'attendances', 'summary', 'startDate', 'endDate'));
     }
 }

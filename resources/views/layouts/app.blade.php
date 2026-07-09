@@ -57,6 +57,7 @@
     <script src="{{ asset('assets/js/vendor.js') }}"></script>
     <script src="https://code.iconify.design/iconify-icon/1.0.8/iconify-icon.min.js"></script>
     <script src="{{ asset('assets/js/app.js') }}"></script>
+    <script src="{{ asset('assets/vendor/fullcalendar/main.min.js') }}"></script>
     @stack('scripts')
 
 </body>

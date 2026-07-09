@@ -52,6 +52,9 @@ Route::get(
 )->middleware('permission:dashboard.employee')
     ->name('dashboard.employee');
 
+
+Route::get('/api/employee/schedule-events', [App\Http\Controllers\DashboardController::class, 'getScheduleEvents'])->name('employee.schedule.events');
+
 Route::middleware('auth')->group(function () {
 
     Route::get('/profile', [ProfileController::class, 'edit'])
@@ -117,6 +120,7 @@ Route::middleware('auth')->group(function () {
         'store',
         'destroy'
     ]);
+    Route::post('/assignments/update-inline', [ShiftAssignmentController::class, 'updateInline'])->name('assignments.update-inline');
 
     Route::get(
         'leave-requests/approval',

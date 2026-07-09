@@ -2,6 +2,42 @@
 @section('title', 'Penjadwalan Karyawan Matrix')
 
 @section('content')
+<style>
+    /* Menghilangkan border default dan panah bawaan browser agar dropdown tampak bersih */
+    .inline-shift-select {
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        background-image: none !important;
+        padding-right: 0 !important;
+        text-align: center;
+        text-align-last: center; /* Memastikan teks di tengah untuk beberapa browser */
+        border: none !important;
+        background-color: transparent;
+        width: 100%;
+        height: 100%;
+        min-width: 65px;
+        font-weight: 600 !important;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    /* Memberikan efek sedikit bayangan/border tipis saat dropdown di-klik atau fokus */
+    .inline-shift-select:focus {
+        outline: none !important;
+        box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.2) !important;
+        background-color: #fff !important;
+        border-radius: 4px;
+    }
+
+    /* Mengembalikan warna teks opsi di dalam dropdown agar tetap hitam/jelas saat dibuka */
+    .inline-shift-select option {
+        color: #333 !important;
+        font-weight: normal !important;
+        background-color: #fff !important;
+    }
+</style>
+
     <div class="wrapper">
         <div class="page-content">
             <div class="container-xxl">
@@ -26,8 +62,15 @@
                         <form method="GET" action="{{ route('assignments.index') }}">
                             <div class="row g-3 align-items-end">
                                 <div class="col-md-4">
-                                    <label class="form-label fw-semibold">Cari Karyawan</label>
-                                    <input type="text" name="search" class="form-control" placeholder="Masukkan nama..." value="{{ request('search') }}">
+                                    <label class="form-label fw-semibold">Pilih Karyawan</label>
+                                    <select name="employee_id" class="form-select">
+                                        <option value="">-- Semua Karyawan --</option>
+                                        @foreach($allActiveEmployees as $emp)
+                                            <option value="{{ $emp->id }}" {{ request('employee_id') == $emp->id ? 'selected' : '' }}>
+                                                {{ $emp->full_name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
                                 </div>
 
                                 <div class="col-md-3">
@@ -113,31 +156,30 @@
                                                     $isSunday = \Carbon\Carbon::parse($date)->isSunday();
                                                     $isHoliday = array_key_exists($date, $holidays);
                                                     $holidayName = $isHoliday ? $holidays[$date] : '';
-                                                    $shiftName = $assignmentsData[$employee->id][$date] ?? '-';
-
-                                                    // 🌟 KODE ANDA TETAP DIPERTAHANKAN UTUH DI SINI:
-                                                    // Tentukan warna badge berdasarkan jenis shift kerja
-                                                    $badgeClass = 'bg-light text-muted';
-                                                    if (str_contains(strtolower($shiftName), '1')) {
-                                                        $badgeClass = 'badge bg-primary me-1';
-                                                    } elseif (str_contains(strtolower($shiftName), '2')) {
-                                                        $badgeClass = 'badge bg-success me-1';
-                                                    } elseif (str_contains(strtolower($shiftName), '3')) {
-                                                        $badgeClass = 'badge bg-purple me-1';
-                                                    } elseif ($shiftName != '-') {
-                                                        $badgeClass = 'badge bg-danger me-1';
-                                                    }
+                                                    
+                                                    // Ambil data array penugasan baru dari controller
+                                                    $assignment = $assignmentsData[$employee->id][$date] ?? null;
+                                                    $currentShiftId = $assignment ? $assignment['shift_id'] : '';
+                                                    $shiftName      = $assignment ? $assignment['shift_name'] : '-';
                                                 @endphp
 
-                                                {{-- Kolom td akan otomatis memerah samar jika Minggu ATAU Hari Libur Nasional --}}
-                                                <td class="text-center @if($isSunday || $isHoliday) bg-danger-subtle text-danger @endif"
+                                                {{-- Kolom td otomatis memerah samar jika Minggu / Hari Libur Nasional --}}
+                                                <td class="text-center p-1 @if($isSunday || $isHoliday) bg-danger-subtle @endif"
                                                     @if($isHoliday) data-bs-toggle="tooltip" title="Libur Nasional: {{ $holidayName }}" @endif>
                                                     
-                                                    @if($isHoliday && $shiftName == '-')
-                                                        <span class="fw-bold fs-11 text-danger" style="cursor: help;">HOL</span>
-                                                    @else
-                                                        <span class="{{ $badgeClass }} fs-11 fw-medium">{{ $shiftName }}</span>
-                                                    @endif
+                                                    {{-- Dropdown Live Edit Inline Matrix --}}
+                                                    <select class="form-select form-select-sm inline-shift-select text-center p-0 fs-11 fw-medium border-0 bg-transparent"
+                                                            data-employee-id="{{ $employee->id }}"
+                                                            data-date="{{ $date }}"
+                                                            style="min-width: 75px; cursor: pointer;">
+                                                        
+                                                        <option value="" class="text-muted">-</option>
+                                                        @foreach($shifts as $shift)
+                                                            <option value="{{ $shift->id }}" {{ $currentShiftId == $shift->id ? 'selected' : '' }}>
+                                                                {{ $shift->name }}
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
                                                     
                                                 </td>
                                             @endforeach
@@ -158,4 +200,81 @@
             </div>
         </div>
     </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const selects = document.querySelectorAll('.inline-shift-select');
+
+        selects.forEach(select => {
+            // Beri warna teks awal saat halaman pertama dimuat
+            applySelectColor(select);
+
+            // Handler ketika dropdown diubah nilainya
+            select.addEventListener('change', function () {
+                const employeeId = this.getAttribute('data-employee-id');
+                const date = this.getAttribute('data-date');
+                const shiftId = this.value;
+                const element = this;
+
+                // Indikator loading visual sementara proses simpan
+                element.classList.add('bg-warning-subtle');
+
+                fetch(`{{ route('assignments.update-inline') }}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        employee_id: employeeId,
+                        date: date,
+                        shift_id: shiftId
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    element.classList.remove('bg-warning-subtle');
+                    if (data.status === 'success') {
+                        // Perbarui pewarnaan teks
+                        applySelectColor(element);
+                        
+                        // Efek kilas sukses warna hijau kilat
+                        element.classList.add('bg-success-subtle');
+                        setTimeout(() => element.classList.remove('bg-success-subtle'), 400);
+                    } else {
+                        alert(data.message);
+                        location.reload();
+                    }
+                })
+                .catch(error => {
+                    element.classList.remove('bg-warning-subtle');
+                    console.error('Error:', error);
+                    alert('Terjadi kesalahan sistem saat menyimpan jadwal.');
+                    location.reload();
+                });
+            });
+        });
+
+        // Fungsi mengubah kelas warna teks Bootstrap secara real-time
+        function applySelectColor(el) {
+            const selectedText = el.options[el.selectedIndex].text.toLowerCase();
+            
+            el.classList.remove('text-primary', 'text-success', 'text-purple', 'text-danger', 'text-muted', 'fw-bold');
+            
+            if (selectedText === '-') {
+                el.classList.add('text-muted');
+            } else if (selectedText.includes('siang')) {
+                el.classList.add('text-primary', 'fw-bold');
+            } else if (selectedText.includes('pagi')) {
+                el.classList.add('text-success', 'fw-bold');
+            } else if (selectedText.includes('malam')) {
+                el.classList.add('text-purple', 'fw-bold');
+            } else {
+                el.classList.add('text-danger', 'fw-bold');
+            }
+        }
+    });
+</script>
+
 @endsection

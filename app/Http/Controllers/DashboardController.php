@@ -8,6 +8,10 @@ use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\User;
 use App\Models\LoginActivity;
+use App\Models\ShiftAssignment; // 🌟 Pastikan Model ini di-import
+use App\Models\Holiday;         // 🌟 Pastikan Model ini di-import
+use Carbon\Carbon;              // 🌟 Pastikan Carbon di-import
+use Carbon\CarbonPeriod;        // 🌟 Pastikan CarbonPeriod di-import
 
 class DashboardController extends Controller
 {
@@ -43,15 +47,56 @@ class DashboardController extends Controller
             abort(403, 'Data karyawan tidak ditemukan atau belum terhubung dengan akun login Anda.');
         }
 
+        // --- 🌟 AWAL LOGIKA TAMBAHAN UNTUK JADWAL SHIFT KARYAWAN ---
+
+        // 1. Tentukan periode bulan berjalan saat ini (Cut-off: 26 bulan lalu s/d 25 bulan ini)
+        $currentMonth = date('m');
+        $currentYear = date('Y');
+        $startDate = Carbon::create($currentYear, $currentMonth, 26)->subMonth();
+        $endDate = Carbon::create($currentYear, $currentMonth, 25);
+
+        // Generate daftar tanggal periode untuk kolom header tabel
+        $period = CarbonPeriod::create($startDate, $endDate);
+        $dates = [];
+        foreach ($period as $date) {
+            $dates[] = $date->format('Y-m-d');
+        }
+
+        // 2. Ambil data hari libur nasional pada rentang periode ini
+        $holidays = Holiday::whereBetween('date_applied', [
+            $startDate->startOfDay()->toDateTimeString(),
+            $endDate->endOfDay()->toDateTimeString()
+        ])->pluck('name', 'date_applied')->toArray();
+
+        // 3. Ambil data jadwal KHUSUS karyawan yang sedang login ini
+        $assignments = ShiftAssignment::with('shift')
+            ->where('employee_id', $employee->id)
+            ->whereBetween('date', [
+                $startDate->startOfDay()->toDateTimeString(),
+                $endDate->endOfDay()->toDateTimeString()
+            ])
+            ->get();
+
+        // Petakan ke array agar mudah dipanggil di Blade berdasarkan string tanggal: $myAssignments['Y-m-d']
+        $myAssignments = [];
+        foreach ($assignments as $assignment) {
+            $formattedDate = Carbon::parse($assignment->date)->format('Y-m-d');
+            $myAssignments[$formattedDate] = [
+                'shift_name' => $assignment->shift->name ?? '-',
+            ];
+        }
+
+        // --- 🌟 AKHIR LOGIKA TAMBAHAN UNTUK JADWAL SHIFT ---
+
+
         // 1. Ambil kontrak yang sedang aktif langsung via Model Contract
         $activeContract = \App\Models\EmployeeContract::where('employee_id', $employee->id)
-            ->where('is_active', true) // Jika di PostgreSQL menggunakan string 't', ubah menjadi 't'
+            ->where('is_active', true)
             ->latest()
             ->first();
 
         // 2. Ambil data alokasi kuota berdasarkan kontrak aktif tersebut
-        // Kita load juga relasi leaveType agar nama jenis cutinya bisa muncul di tabel
-        $leaveAllocations = collect(); // Default berupa collection kosong jika kontrak tidak ada
+        $leaveAllocations = collect();
 
         if ($activeContract) {
             $leaveAllocations = \App\Models\LeaveAllocation::with('leaveType')
@@ -59,18 +104,24 @@ class DashboardController extends Controller
                 ->get();
         }
 
-        // 3. Count data pengajuan cuti (tetap dipertahankan jika sewaktu-waktu ingin dipakai)
+        // 3. Count data pengajuan cuti
         $pendingLeaves = $employee->leaveRequests()->where('status', 'pending')->count();
         $approvedLeaves = $employee->leaveRequests()->where('status', 'approved')->count();
         $rejectedLeaves = $employee->leaveRequests()->where('status', 'rejected')->count();
 
+        // Kirim variabel tambahan ke view dashboard.employee
         return view('dashboard.employee', compact(
             'employee',
             'activeContract',
-            'leaveAllocations', // <--- Variabel baru yang dibutuhkan oleh tabel di Blade
+            'leaveAllocations',
             'pendingLeaves',
             'approvedLeaves',
-            'rejectedLeaves'
+            'rejectedLeaves',
+            'dates',           // 🌟 Tambahan baru
+            'myAssignments',   // 🌟 Tambahan baru
+            'holidays',        // 🌟 Tambahan baru
+            'startDate',       // 🌟 Tambahan baru
+            'endDate'          // 🌟 Tambahan baru
         ));
     }
 
@@ -106,5 +157,67 @@ class DashboardController extends Controller
                 'latestLogins'
             )
         );
+    }
+
+    // Paste ini di dalam class DashboardController (di bagian paling bawah sebelum penutup '}')
+
+    public function getScheduleEvents(\Illuminate\Http\Request $request)
+    {
+        $employee = auth()->user()->employee;
+        if (!$employee) {
+            return response()->json([]);
+        }
+
+        // FullCalendar otomatis mengirim parameter range tanggal yang sedang dibuka (start & end)
+        $start = $request->input('start');
+        $end = $request->input('end');
+
+        // 1. Ambil data libur nasional pada range tanggal tersebut
+        $holidays = \App\Models\Holiday::whereBetween('date_applied', [$start, $end])
+            ->pluck('name', 'date_applied')
+            ->toArray();
+
+        // 2. Ambil data jadwal shift karyawan pada range tanggal tersebut
+        $assignments = \App\Models\ShiftAssignment::with('shift')
+            ->where('employee_id', $employee->id)
+            ->whereBetween('date', [$start, $end])
+            ->get();
+
+        $calendarEvents = [];
+
+        // 3. Masukkan Jadwal Shift ke array event
+        foreach ($assignments as $assignment) {
+            $formattedDate = \Carbon\Carbon::parse($assignment->date)->format('Y-m-d');
+            $shiftName = $assignment->shift->name ?? '-';
+            $shiftLower = strtolower($shiftName);
+
+            $className = 'bg-secondary';
+            if (str_contains($shiftLower, 'pagi')) {
+                $className = 'bg-success';
+            } elseif (str_contains($shiftLower, 'siang')) {
+                $className = 'bg-primary';
+            } elseif (str_contains($shiftLower, 'malam')) {
+                $className = 'bg-info';
+            } elseif (str_contains($shiftLower, 'off') || str_contains($shiftLower, 'libur')) {
+                $className = 'bg-danger';
+            }
+
+            $calendarEvents[] = [
+                'title' => $shiftName,
+                'start' => $formattedDate,
+                'className' => [$className, 'p-1', 'fw-semibold', 'border-0'] // Menggunakan array class bawaan template
+            ];
+        }
+
+        // 4. Masukkan Hari Libur Nasional ke array event
+        foreach ($holidays as $holidayDate => $holidayName) {
+            $calendarEvents[] = [
+                'title' => '🎉 ' . $holidayName,
+                'start' => $holidayDate,
+                'className' => ['bg-danger', 'p-1', 'fw-semibold', 'border-0']
+            ];
+        }
+
+        return response()->json($calendarEvents);
     }
 }

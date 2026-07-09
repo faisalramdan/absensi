@@ -4,99 +4,44 @@
 
 @section('content')
 @push('styles')
-
 <style>
-
-.attendance-table{
-
-    max-height:75vh;
-
-    overflow:auto;
-
+.attendance-table {
+    max-height: 75vh;
+    overflow: auto;
 }
-
-.attendance-table table{
-
-    white-space:nowrap;
-
+.attendance-table table {
+    white-space: nowrap;
 }
-
-.attendance-table thead th{
-
-    position:sticky;
-
-    top:0;
-
-    z-index:30;
-
-    background:#fff;
-
-    box-shadow:0 2px 2px rgba(0,0,0,.05);
-
+.attendance-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: #fff;
+    box-shadow: 0 2px 2px rgba(0,0,0,.05);
 }
-
 /* Freeze No */
-
-.sticky-col-1{
-
-    position:sticky;
-
-    left:0;
-
-    z-index:25;
-
-    background:#fff;
-
-    min-width:60px;
-
+.sticky-col-1 {
+    position: sticky;
+    left: 0;
+    z-index: 25;
+    background: #fff;
+    min-width: 60px;
 }
-
-/* Freeze NIK */
-
-.sticky-col-2{
-
-    position:sticky;
-
-    left:60px;
-
-    z-index:25;
-
-    background:#fff;
-
-    min-width:120px;
-
+/* Freeze NIK/Nama Group */
+.sticky-col-2 {
+    position: sticky;
+    left: 60px;
+    z-index: 25;
+    background: #fff;
+    min-width: 240px;
 }
-
-/* Freeze Nama */
-
-.sticky-col-3{
-
-    position:sticky;
-
-    left:180px;
-
-    z-index:25;
-
-    background:#fff;
-
-    min-width:260px;
-
-}
-
-/* Header */
-
+/* Header Freeze */
 thead .sticky-col-1,
-thead .sticky-col-2,
-thead .sticky-col-3{
-
-    z-index:40;
-
-    background:#f8f9fa;
-
+thead .sticky-col-2 {
+    z-index: 40;
+    background: #f8f9fa !important;
 }
-
 </style>
-
 @endpush
 
 <div class="wrapper">
@@ -174,14 +119,12 @@ thead .sticky-col-3{
                 </div>
             </div>
 
-            {{-- SUMMARY BLOCK: AKUMULASI METRIK (TAMPILAN BARU) --}}
+            {{-- SUMMARY BLOCK: AKUMULASI METRIK GLOBAL --}}
             <div class="col-xl-12 mb-4">
                 <div class="card border-0 shadow-sm">
-
                     <div class="card-header bg-transparent py-3">
                         <h5 class="card-title mb-0 fw-semibold text-dark">Ringkasan Statistik Kehadiran (Total Makro)</h5>
                     </div>
-
                     <div class="card-body">
                         <div class="table-responsive">
                             <table class="table table-bordered align-middle mb-0">
@@ -198,31 +141,29 @@ thead .sticky-col-3{
                                         <td>
                                             <div class="d-flex flex-wrap gap-2">
                                                 <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1.5 fw-semibold">
-                                                    Present: {{ number_format($cards['present']) }}
+                                                    Present: {{ number_format($cards['present'] ?? 0) }}
+                                                </span>
+                                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1.5 fw-semibold">
+                                                    WFA: {{ number_format($cards['wfa'] ?? 0) }}
                                                 </span>
                                                 <span class="badge bg-info-subtle text-info border border-info-subtle px-2 py-1.5 fw-semibold">
                                                     Sakit: {{ number_format($cards['sick'] ?? 0) }}
                                                 </span>
                                                 <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1.5 fw-semibold">
-                                                    Izin: {{ number_format($cards['izin']) }}
+                                                    Izin: {{ number_format($cards['izin'] ?? 0) }}
                                                 </span>
                                                 <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1.5 fw-semibold">
-                                                    Alpha: {{ number_format($cards['alpha']) }}
+                                                    Alpha: {{ number_format($cards['alpha'] ?? 0) }}
                                                 </span>
                                                 <span class="badge bg-light text-dark border px-2 py-1.5 fw-semibold" style="background-color: #f3e5f5; color: #8e24aa !important; border-color: #d1c4e9 !important;">
-                                                    Cuti: {{ number_format($cards['cuti']) }}
+                                                    Cuti: {{ number_format($cards['cuti'] ?? 0) }}
                                                 </span>
                                                 <span class="badge px-2 py-1.5 fw-semibold border" style="background-color: #e8eaf6; color: #3f51b5; border-color: #c5cae9 !important;">
-                                                    IDT: {{ number_format($cards['idt']) }}
+                                                    IDT: {{ number_format($cards['idt'] ?? 0) }}
                                                 </span>
                                                 <span class="badge px-2 py-1.5 fw-semibold border" style="background-color: #e8eaf6; color: #3f51b5; border-color: #c5cae9 !important;">
-                                                    IPC: {{ number_format($cards['ipc']) }}
+                                                    IPC: {{ number_format($cards['ipc'] ?? 0) }}
                                                 </span>
-                                                @if(isset($cards['wfa']))
-                                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1.5 fw-semibold">
-                                                    WFA: {{ number_format($cards['wfa']) }}
-                                                </span>
-                                                @endif
                                             </div>
                                         </td>
                                     </tr>
@@ -230,37 +171,34 @@ thead .sticky-col-3{
                                     <tr>
                                         <th class="fw-semibold text-secondary ps-3">Keterlambatan (Late)</th>
                                         <td>
-                                            <span class="fw-bold text-warning">{{ number_format($cards['late']) }} Kali</span>
-                                            @if($cards['total_late_minutes'] > 0)
+                                            <span class="fw-bold text-warning">{{ number_format($cards['late'] ?? 0) }} Kali</span>
+                                            @if(($cards['total_late_minutes'] ?? 0) > 0)
                                                 <span class="text-muted small ms-2">
                                                     (Total durasi: {{ $cards['late_hours'] }} Jam {{ $cards['late_minutes_remainder'] }} Menit)
                                                 </span>
                                             @endif
                                         </td>
                                     </tr>
-
                                     {{-- Pelanggaran Waktu Pulang --}}
                                     <tr>
                                         <th class="fw-semibold text-secondary ps-3">Pulang Cepat (Early Leave)</th>
                                         <td>
-                                            <span class="fw-bold" style="color: #00796b;">{{ number_format($cards['early_leave']) }} Kali</span>
-                                            @if($cards['total_early_leave_minutes'] > 0)
+                                            <span class="fw-bold" style="color: #00796b;">{{ number_format($cards['early_leave'] ?? 0) }} Kali</span>
+                                            @if(($cards['total_early_leave_minutes'] ?? 0) > 0)
                                                 <span class="text-muted small ms-2">
                                                     (Total durasi: {{ $cards['early_leave_hours'] }} Jam {{ $cards['early_leave_minutes_remainder'] }} Menit)
                                                 </span>
                                             @endif
                                         </td>
                                     </tr>
-                                    
                                     {{-- Kelalaian Absen --}}
                                     <tr>
                                         <th class="fw-semibold text-secondary ps-3">Kelalaian Log Absen</th>
                                         <td>
                                             <span class="text-danger fw-medium">
-                                                Lupa Check-In:  <strong>{{ $cards['forgot_in'] }}</strong>
+                                                Lupa Check-In: <strong>{{ $cards['forgot_in'] ?? 0 }}</strong>
                                                 <span class="text-muted mx-2">|</span>
-                                                Lupa Check-Out: <strong>{{ $cards['forgot_out'] }}</strong>
-                                                
+                                                Lupa Check-Out: <strong>{{ $cards['forgot_out'] ?? 0 }}</strong>
                                             </span>
                                         </td>
                                     </tr>
@@ -270,20 +208,27 @@ thead .sticky-col-3{
                                         <td class="text-dark">
                                             <strong>{{ $workingDays }}</strong> Hari Kerja
                                             <span class="text-muted small ms-2">
-                                                  (Dari {{ $calendarDays ?? '0' }} hari kalender - {{ $sundayCount }} Off - {{ $holidayCount }} Libur)
+                                                (Dari {{ $calendarDays ?? '0' }} hari kalender - {{ $sundayCount }} Off - {{ $holidayCount }} Libur)
                                             </span>
                                         </td>
                                     </tr>
-                                    {{-- Defisit/Kurang Hari & Jam --}}
-                                    <tr class="table-danger-subtle" style="background-color: #fdf2f2;">
-                                        <th class="fw-semibold text-danger ps-3">Total Defisit Jam/Hari Kerja</th>
-                                        <td class="text-danger fw-bold">
-                                            Kurang Hari Kerja: <span class="badge bg-danger px-2 py-1 ms-1">{{ $cards['kurang_hk'] }} Hari</span>
-                                            <span class="text-muted mx-2">|</span>
-                                            Kurang Durasi: 
-                                            <span class="badge bg-danger px-2 py-1 ms-1">
-                                                {{ floor($cards['kurang_jam']/60) }} Jam {{ $cards['kurang_jam']%60 }} Menit
-                                            </span>
+                                    {{-- Bagian baris tabel ringkasan statis individu --}}
+                                    {{-- Akumulasi Kurang Jam Kerja Per Karyawan di Halaman Index --}}
+                                    <tr class="table-light">
+                                        <th class="fw-medium text-secondary">Kurang dari jam kerja</th>
+                                        <td class="fw-bold text-dark">
+                                            {{ $cards['short_work_count'] ?? 0 }}x
+                                        </td>
+                                    </tr>
+                                    <tr class="table-danger">
+                                        <th class="fw-bold text-danger">Total kurang jam kerja</th>
+                                        <td class="fs-5 fw-bold text-danger">
+                                            @if(isset($cards['kurang_jam']) && $cards['kurang_jam'] > 0)
+                                                {{ floor($cards['kurang_jam'] / 60) }} <small class="fs-6 fw-normal">Jam</small>
+                                                {{ $cards['kurang_jam'] % 60 }} <small class="fs-6 fw-normal">Menit</small>
+                                            @else
+                                                0 <small class="fs-6 fw-normal">Jam</small> 0 <small class="fs-6 fw-normal">Menit</small>
+                                            @endif
                                         </td>
                                     </tr>
                                 </tbody>
@@ -299,18 +244,18 @@ thead .sticky-col-3{
                     <h5 class="card-title mb-0 fw-semibold text-dark">Rincian Performa Kehadiran Karyawan</h5>
                 </div>
                 <div class="card-body p-0">
-                    <div class="table-responsive">
+                    <div class="attendance-table">
                         <table class="table table-bordered table-hover align-middle mb-0">
                             <thead class="table-light text-muted small">
                                 <tr>
-                                    <th class="text-center" width="50">No</th>
-                                    <th>Nama Karyawan / NIK</th>
+                                    <th class="text-center sticky-col-1" width="50">No</th>
+                                    <th class="sticky-col-2">Nama Karyawan / NIK</th>
                                     <th class="text-center">Present</th>
+                                    <th class="text-center" style="background-color: #f0f7ff;">WFA</th>
                                     <th class="text-center">Sakit</th>
                                     <th class="text-center">Izin</th>
                                     <th class="text-center">Alpha</th>
                                     <th class="text-center">Cuti</th>
-                                    <th class="text-center">WFA</th>
                                     <th class="text-center">Late</th>
                                     <th class="text-center">IDT</th>
                                     <th class="text-center">Forgot In</th>
@@ -324,17 +269,20 @@ thead .sticky-col-3{
                             <tbody>
                                 @forelse($summary as $item)
                                     <tr>
-                                        <td class="text-center text-muted">{{ $loop->iteration }}</td>
-                                        <td>
+                                        <td class="text-center text-muted sticky-col-1">{{ $loop->iteration }}</td>
+                                        <td class="sticky-col-2">
                                             <div class="fw-semibold text-dark">{{ $item['employee']->full_name }}</div>
                                             <div class="text-muted small">{{ $item['employee']->nik }}</div>
                                         </td>
                                         <td class="text-center fw-medium text-success">{{ $item['present'] }}</td>
+                                        {{-- Data WFA Karyawan --}}
+                                        <td class="text-center fw-medium text-primary" style="background-color: #fafdff;">
+                                            {{ $item['wfa'] ?: '-' }}
+                                        </td>
                                         <td class="text-center">{{ $item['sick'] }}</td>
                                         <td class="text-center">{{ $item['permission'] }}</td>
                                         <td class="text-center @if($item['alpha'] > 0) text-danger fw-bold @endif">{{ $item['alpha'] }}</td>
                                         <td class="text-center">{{ $item['annual_leave'] }}</td>
-                                        <td class="text-center text-muted">{{ $item['wfa'] ?: '-' }}</td>
                                         <td class="text-center">
                                             @if($item['late'] > 0)
                                                 <span class="badge bg-warning-subtle text-warning fw-semibold">{{ $item['late'] }}</span>
@@ -358,6 +306,7 @@ thead .sticky-col-3{
                                                 <span class="text-muted">-</span>
                                             @else
                                                 {{ $jam }}j {{ $menit }}m
+                                                <div class="text-muted" style="font-size: 10px; font-weight: normal;">({{ $item['short_work_count'] ?? 0 }}x)</div>
                                             @endif
                                         </td>
                                         <td class="text-center">
@@ -388,4 +337,42 @@ thead .sticky-col-3{
     </div>
 </div>
 
+{{-- JAVASCRIPT AUTOMATION CUT-OFF --}}
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const monthSelect = document.querySelector('select[name="month"]');
+    const yearSelect = document.querySelector('select[name="year"]');
+    const startDateInput = document.querySelector('input[name="start_date"]');
+    const endDateInput = document.querySelector('input[name="end_date"]');
+
+    function updateCutoffDates() {
+        const selectedMonth = parseInt(monthSelect.value);
+        const selectedYear = parseInt(yearSelect.value);
+
+        if (!selectedMonth || !selectedYear) return;
+
+        const endMonthStr = String(selectedMonth).padStart(2, '0');
+        const endDateStr = `${selectedYear}-${endMonthStr}-25`;
+
+        let startMonth = selectedMonth - 1;
+        let startYear = selectedYear;
+
+        if (startMonth === 0) {
+            startMonth = 12;
+            startYear = selectedYear - 1;
+        }
+
+        const startMonthStr = String(startMonth).padStart(2, '0');
+        const startDateStr = `${startYear}-${startMonthStr}-26`;
+
+        startDateInput.value = startDateStr;
+        endDateInput.value = endDateStr;
+    }
+
+    monthSelect.addEventListener('change', updateCutoffDates);
+    yearSelect.addEventListener('change', updateCutoffDates);
+});
+</script>
+@endpush
 @endsection

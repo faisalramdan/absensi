@@ -5,7 +5,7 @@
     <div class="wrapper">
         <div class="page-content">
             <div class="container-xxl">
-
+            
                 {{-- ALERT SUCCESS --}}
                 @if(session('success'))
                     <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -136,6 +136,9 @@
                                                     <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1.5 fw-semibold">
                                                         Present: {{ number_format($summary['present']) }}
                                                     </span>
+                                                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1.5 fw-semibold">
+                                                        WFA: {{ number_format($summary['wfa']) }}
+                                                    </span>
                                                     <span class="badge bg-info-subtle text-info border border-info-subtle px-2 py-1.5 fw-semibold">
                                                         Sakit: {{ number_format($summary['sakit']) }}
                                                     </span>
@@ -207,11 +210,22 @@
                                             </td>
                                         </tr>
 
-                                        {{-- Akumulasi Jam Kerja --}}
-                                        <tr class="table-success">
-                                            <th class="fw-bold text-success">Total Jam Kerja Efektif</th>
-                                            <td class="fs-5 fw-bold text-success">
-                                                {{ number_format($summary['total_work_minutes']/60, 1) }} <small class="fs-6 fw-normal">Jam</small>
+                                        {{-- Akumulasi Kurang Jam Kerja --}}
+                                        <tr class="table-light">
+                                            <th class="fw-medium text-secondary">Kurang dari jam kerja</th>
+                                            <td class="fw-bold text-dark">
+                                                {{ $summary['short_work_count'] ?? 0 }}x
+                                            </td>
+                                        </tr>
+                                        <tr class="table-danger">
+                                            <th class="fw-bold text-danger">Total kurang jam kerja</th>
+                                            <td class="fs-5 fw-bold text-danger">
+                                                @if(isset($summary['total_short_work_minutes']) && $summary['total_short_work_minutes'] > 0)
+                                                    {{ floor($summary['total_short_work_minutes'] / 60) }} <small class="fs-6 fw-normal">Jam</small>
+                                                    {{ $summary['total_short_work_minutes'] % 60 }} <small class="fs-6 fw-normal">Menit</small>
+                                                @else
+                                                    0 <small class="fs-6 fw-normal">Jam</small> 0 <small class="fs-6 fw-normal">Menit</small>
+                                                @endif
                                             </td>
                                         </tr>
                                     </tbody>
@@ -275,11 +289,11 @@
                                                     // Tentukan warna badge berdasarkan jenis shift kerja (meniru contoh Anda)
                                                     $badgeClass = 'bg-light text-muted'; // Default jika '-'
 
-                                                    if (str_contains(strtolower($shiftName), '1')) {
+                                                    if (str_contains(strtolower($shiftName), 'siang')) {
                                                         $badgeClass = 'bg-primary text-white';
-                                                    } elseif (str_contains(strtolower($shiftName), '2')) {
+                                                    } elseif (str_contains(strtolower($shiftName), 'pagi')) {
                                                         $badgeClass = 'bg-success text-white';
-                                                    } elseif (str_contains(strtolower($shiftName), '3')) {
+                                                    } elseif (str_contains(strtolower($shiftName), 'malam')) {
                                                         $badgeClass = 'bg-purple text-white'; // Pastikan kelas .bg-purple tersedia di CSS/Bootstrap Anda
                                                     } elseif ($shiftName != '-') {
                                                         $badgeClass = 'bg-danger text-white';
@@ -333,14 +347,24 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                <span class="fw-medium text-dark">
-                                                    @if($attendance->work_minutes)
-                                                        {{ floor($attendance->work_minutes / 60) }} Jam
-                                                        {{ $attendance->work_minutes % 60 }} Menit
-                                                    @else
-                                                        -
+                                                <div class="d-flex flex-column">
+                                                    <span class="fw-medium text-dark">
+                                                        @if($attendance->work_minutes)
+                                                            {{ floor($attendance->work_minutes / 60) }} Jam 
+                                                            {{ $attendance->work_minutes % 60 }} Menit
+                                                        @else
+                                                            -
+                                                        @endif
+                                                    </span>
+
+                                                    @if($attendance->status !== 'wfa' && $attendance->status !== 'holiday' && $attendance->status !== 'off')
+                                                        @if($attendance->short_work_minutes && $attendance->short_work_minutes > 0)
+                                                            <small class="text-danger fw-bold mt-1">
+                                                                (- {{ floor($attendance->short_work_minutes / 60) }} Jam {{ $attendance->short_work_minutes % 60 }} Menit)
+                                                            </small>
+                                                        @endif
                                                     @endif
-                                                </span>
+                                                </div>
                                             </td>
                                             
                                             <td>

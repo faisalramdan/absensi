@@ -12,6 +12,7 @@ class AttendanceController extends Controller
 {
     public function index(Request $request)
     {
+
         // Mengambil daftar karyawan yang aktif untuk filter dropdown pada view
         $employees = Employee::where('is_active', true)
             ->orderBy('full_name')
@@ -95,13 +96,14 @@ class AttendanceController extends Controller
                 ->where('status', 'present')
                 ->count(),
 
+            // Menghitung total kehadiran WFA
+            'wfa' => (clone $query)
+                ->where('status', 'wfa')
+                ->count(),
+
             // 1. SAKIT: Status 'leave', tag 'izin' di tabel leave_types, dan nama mengandung kata 'sakit'
             'sakit' => (clone $query)
-                ->where('status', 'leave')
-                ->whereHas('leaveType', function ($q) {
-                    $q->where('tag', 'izin')
-                        ->where('name', 'like', '%sakit%');
-                })
+                ->where('status', 'sick')
                 ->count(),
 
             // 2. IJIN: Status 'leave', tag 'izin' di tabel leave_types, tetapi BUKAN izin sakit
@@ -109,7 +111,7 @@ class AttendanceController extends Controller
                 ->where('status', 'leave')
                 ->whereHas('leaveType', function ($q) {
                     $q->where('tag', 'izin')
-                        ->where('name', 'not like', '%sakit%');
+                        ->whereNotIn('code', ['I-IDT', 'I-IPC', 'I-SKT']);
                 })
                 ->count(),
 
@@ -166,6 +168,7 @@ class AttendanceController extends Controller
 
             // Menghitung akumulasi menit waktu kerja efektif
             'total_work_minutes' => (clone $query)
+                ->where('status', 'present') // Hanya hitung total efektif dari kehadiran biasa atau disesuaikan
                 ->sum('work_minutes'),
 
             // Menghitung penanda khusus Izin Pulang Cepat (IPC) murni
@@ -186,6 +189,35 @@ class AttendanceController extends Controller
                         ->orWhereNull('is_idt');
                 })
                 ->sum('late_minutes'),
+
+            /*
+|--------------------------------------------------------------------------
+| SUMMARY BARU (DENGAN PROTEKSI IS_IDT DAN IS_IPC)
+|--------------------------------------------------------------------------
+*/
+            // Menghitung berapa kali karyawan kurang jam kerja (Izin IDT/IPC dan WFA/Holiday diabaikan)
+            'short_work_count' => (clone $query)
+                ->where('short_work_minutes', '>', 0)
+                ->whereNotIn('status', ['wfa', 'holiday', 'off'])
+                ->where(function ($q) {
+                    $q->where('is_idt', '!=', true)->orWhereNull('is_idt');
+                })
+                ->where(function ($q) {
+                    $q->where('is_ipc', '!=', true)->orWhereNull('is_ipc');
+                })
+                ->count(),
+
+            // Menghitung total akumulasi menit kurang jam kerja (Izin IDT/IPC dan WFA/Holiday diabaikan)
+            'total_short_work_minutes' => (clone $query)
+                ->where('short_work_minutes', '>', 0)
+                ->whereNotIn('status', ['wfa', 'holiday', 'off'])
+                ->where(function ($q) {
+                    $q->where('is_idt', '!=', true)->orWhereNull('is_idt');
+                })
+                ->where(function ($q) {
+                    $q->where('is_ipc', '!=', true)->orWhereNull('is_ipc');
+                })
+                ->sum('short_work_minutes'),
         ];
 
         /*
@@ -255,7 +287,7 @@ class AttendanceController extends Controller
         $attendances = $query
             ->orderBy('date', 'desc')
             ->paginate(20)
-            ->withQueryString(); // Memastikan parameter filter request (search/page) tidak hilang saat pindah halaman paginasi
+            ->withQueryString(); // Memastikan parameter filter request tidak hilang saat pindah halaman paginasi
 
         // Melempar seluruh variabel terproses ke view blade
         return view(
