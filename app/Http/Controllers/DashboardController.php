@@ -2,16 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Employee;
-use App\Models\LeaveRequest;
-use App\Models\LeaveType;
+use App\Models\EmployeeContract;
+use App\Models\LeaveAllocation;
+use App\Models\Attendance;
 use App\Models\User;
 use App\Models\LoginActivity;
 use App\Models\ShiftAssignment; // 🌟 Pastikan Model ini di-import
 use App\Models\Holiday;         // 🌟 Pastikan Model ini di-import
 use Carbon\Carbon;              // 🌟 Pastikan Carbon di-import
 use Carbon\CarbonPeriod;        // 🌟 Pastikan CarbonPeriod di-import
+use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
@@ -38,7 +39,7 @@ class DashboardController extends Controller
         abort(403);
     }
 
-    public function employeeDashboard()
+    public function employeeDashboard(Request $request)
     {
         // Ambil data employee milik user yang sedang login
         $employee = auth()->user()->employee;
@@ -47,37 +48,62 @@ class DashboardController extends Controller
             abort(403, 'Data karyawan tidak ditemukan atau belum terhubung dengan akun login Anda.');
         }
 
-        // --- 🌟 AWAL LOGIKA TAMBAHAN UNTUK JADWAL SHIFT KARYAWAN ---
+        /*
+        |--------------------------------------------------------------------------
+        | Tentukan Periode Tanggal Berdasarkan Filter Request
+        |--------------------------------------------------------------------------
+        */
+        $selectedYear = $request->input('year', date('Y'));
+        $selectedMonth = $request->input('month', date('m'));
 
-        // 1. Tentukan periode bulan berjalan saat ini (Cut-off: 26 bulan lalu s/d 25 bulan ini)
-        $currentMonth = date('m');
-        $currentYear = date('Y');
-        $startDate = Carbon::create($currentYear, $currentMonth, 26)->subMonth();
-        $endDate = Carbon::create($currentYear, $currentMonth, 25);
+        // Membuat objek basis Carbon dari bulan & tahun terpilih
+        $targetDate = Carbon::createFromDate($selectedYear, $selectedMonth, 1);
 
-        // Generate daftar tanggal periode untuk kolom header tabel
-        $period = CarbonPeriod::create($startDate, $endDate);
+        // Hitung default tanggal cut-off (26 bulan lalu s/d 25 bulan ini)
+        $defaultStart = $targetDate->copy()->subMonth()->day(26)->format('Y-m-d');
+        $defaultEnd = $targetDate->copy()->day(25)->format('Y-m-d');
+
+        // Pastikan formatnya selalu Y-m-d murni (Mencegah bug format string jam)
+        $startDateInput = Carbon::parse($request->input('start_date', $defaultStart))->format('Y-m-d');
+        $endDateInput = Carbon::parse($request->input('end_date', $defaultEnd))->format('Y-m-d');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Ambil Data Karyawan & Absensi TERLEBIH DAHULU (Sebelum Variabel Digeser Period)
+        |--------------------------------------------------------------------------
+        | Kita gunakan format tanggal murni 'Y-m-d' tanpa jam agar cocok dengan tipe date/datetime.
+        */
+        $myAttendances = Attendance::with(['leaveType'])
+            ->where('employee_id', $employee->id)
+            ->whereBetween('date', [$startDateInput, $endDateInput])
+            ->get();
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Buat Daftar Tanggal Periode untuk Kalender / Tabel Shift
+        |--------------------------------------------------------------------------
+        */
+        $period = CarbonPeriod::create($startDateInput, $endDateInput);
         $dates = [];
         foreach ($period as $date) {
             $dates[] = $date->format('Y-m-d');
         }
 
-        // 2. Ambil data hari libur nasional pada rentang periode ini
-        $holidays = Holiday::whereBetween('date_applied', [
-            $startDate->startOfDay()->toDateTimeString(),
-            $endDate->endOfDay()->toDateTimeString()
-        ])->pluck('name', 'date_applied')->toArray();
+        /*
+        |--------------------------------------------------------------------------
+        | Ambil Jadwal Shift & Hari Libur
+        |--------------------------------------------------------------------------
+        */
+        $holidays = Holiday::whereBetween('date_applied', [$startDateInput, $endDateInput])
+            ->pluck('name', 'date_applied')
+            ->toArray();
 
-        // 3. Ambil data jadwal KHUSUS karyawan yang sedang login ini
         $assignments = ShiftAssignment::with('shift')
             ->where('employee_id', $employee->id)
-            ->whereBetween('date', [
-                $startDate->startOfDay()->toDateTimeString(),
-                $endDate->endOfDay()->toDateTimeString()
-            ])
+            ->whereBetween('date', [$startDateInput, $endDateInput])
             ->get();
 
-        // Petakan ke array agar mudah dipanggil di Blade berdasarkan string tanggal: $myAssignments['Y-m-d']
         $myAssignments = [];
         foreach ($assignments as $assignment) {
             $formattedDate = Carbon::parse($assignment->date)->format('Y-m-d');
@@ -86,30 +112,139 @@ class DashboardController extends Controller
             ];
         }
 
-        // --- 🌟 AKHIR LOGIKA TAMBAHAN UNTUK JADWAL SHIFT ---
-
-
-        // 1. Ambil kontrak yang sedang aktif langsung via Model Contract
-        $activeContract = \App\Models\EmployeeContract::where('employee_id', $employee->id)
+        /*
+        |--------------------------------------------------------------------------
+        | Data Kontrak & Sisa Cuti
+        |--------------------------------------------------------------------------
+        */
+        $activeContract = EmployeeContract::where('employee_id', $employee->id)
             ->where('is_active', true)
             ->latest()
             ->first();
 
-        // 2. Ambil data alokasi kuota berdasarkan kontrak aktif tersebut
         $leaveAllocations = collect();
-
         if ($activeContract) {
-            $leaveAllocations = \App\Models\LeaveAllocation::with('leaveType')
+            $leaveAllocations = LeaveAllocation::with('leaveType')
                 ->where('employee_contract_id', $activeContract->id)
                 ->get();
         }
 
-        // 3. Count data pengajuan cuti
         $pendingLeaves = $employee->leaveRequests()->where('status', 'pending')->count();
         $approvedLeaves = $employee->leaveRequests()->where('status', 'approved')->count();
         $rejectedLeaves = $employee->leaveRequests()->where('status', 'rejected')->count();
 
-        // Kirim variabel tambahan ke view dashboard.employee
+        /*
+    |--------------------------------------------------------------------------
+    | KALKULASI METRIK (DIOPTIMALKAN UNTUK MENANGKAP STATUS LEAVE & HOLIDAY)
+    |--------------------------------------------------------------------------
+    */
+        $totalLateMinutes = $myAttendances->filter(function ($item) {
+            return (int) $item->late_minutes > 0 && !$item->is_idt;
+        })->sum('late_minutes');
+
+        $totalEarlyLeaveMinutes = $myAttendances->filter(function ($item) {
+            return (int) $item->early_leave_minutes > 0 && !$item->is_ipc;
+        })->sum('early_leave_minutes');
+
+        // 1. Total Hari Kalender berdasarkan filter tanggal asli
+        $calendarDays = \Carbon\Carbon::parse($startDateInput)->diffInDays(\Carbon\Carbon::parse($endDateInput)) + 1;
+
+        // 2. Hitung jumlah hari libur akhir pekan (Off) murni dari kalender Carbon
+        $period = \Carbon\CarbonPeriod::create($startDateInput, $endDateInput);
+        $sundayCount = 0;
+        foreach ($period as $date) {
+            // Jika sistem Anda 5 hari kerja, gunakan: $date->isWeekend()
+            // Jika sistem Anda 6 hari kerja (hanya Minggu yang off), gunakan: $date->isSunday()
+            if ($date->isSunday()) {
+                $sundayCount++;
+            }
+        }
+
+        // 3. Menghitung Hari Libur Nasional (Holiday) yang terdata di absensi
+        $holidayCount = $myAttendances->filter(fn($i) => strtolower($i->status) === 'holiday')->count();
+
+        // 4. Hari Kerja Resmi (Total Kalender - Hari Off Akhir Pekan - Libur Nasional)
+        $workingDays = $calendarDays - $sundayCount - $holidayCount;
+
+        $cards = [
+            'present' => $myAttendances->filter(fn($i) => strtolower($i->status) === 'present')->count(),
+            'wfa' => $myAttendances->filter(fn($i) => strtolower($i->status) === 'wfa')->count(),
+            'sakit' => $myAttendances->filter(fn($i) => in_array(strtolower($i->status), ['sick', 'sakit']))->count(),
+            'alpha' => $myAttendances->filter(fn($i) => strtolower($i->status) === 'alpha')->count(),
+
+            // Menghitung Cuti jika status 'leave' dan tag tipe cutinya telak berisi 'cuti'
+            'cuti' => $myAttendances->filter(function ($item) {
+                return strtolower($item->status) === 'leave'
+                    && strtolower(optional($item->leaveType)->tag) === 'cuti';
+            })->count(),
+
+            // Menghitung Izin jika status 'leave' dan tag-nya 'izin' ATAU jika detail leaveType-nya kosong/tidak kecolongan
+            'ijin' => $myAttendances->filter(function ($item) {
+                if (strtolower($item->status) !== 'leave') {
+                    return false;
+                }
+
+                $tag = strtolower(optional($item->leaveType)->tag);
+                $code = strtoupper(optional($item->leaveType)->code);
+
+                // Jika tag-nya jelas 'izin', masukkan ke sini (kecuali kode khusus IDT/IPC/SKT)
+                if ($tag === 'izin' && !in_array($code, ['I-IDT', 'I-IPC', 'I-SKT'])) {
+                    return true;
+                }
+
+                // Fallback: Jika di DB tipenya tidak terelasi (null) atau bukan 'cuti', kumpulkan ke 'ijin' agar tidak hilang menjadi 0
+                if (empty($tag) || $tag !== 'cuti') {
+                    return true;
+                }
+
+                return false;
+            })->count(),
+
+            'forgot_in' => $myAttendances->where('forgot_check_in', true)->count(),
+            'forgot_out' => $myAttendances->where('forgot_check_out', true)->count(),
+            'idt' => $myAttendances->where('is_idt', true)->count(),
+            'ipc' => $myAttendances->where('is_ipc', true)->count(),
+
+            // Mengamankan hitungan holiday dari array Anda
+            'holiday' => $myAttendances->filter(fn($i) => strtolower($i->status) === 'holiday')->count(),
+            'off' => $myAttendances->filter(fn($i) => strtolower($i->status) === 'off')->count(),
+
+            'late' => $myAttendances->filter(function ($item) {
+                return (int) $item->late_minutes > 0 && !$item->is_idt;
+            })->count(),
+
+            'early_leave' => $myAttendances->filter(function ($item) {
+                return (int) $item->early_leave_minutes > 0 && !$item->is_ipc;
+            })->count(),
+
+            'short_work_count' => $myAttendances->filter(function ($item) {
+                return (int) $item->short_work_minutes > 0
+                    && !in_array(strtolower($item->status), ['wfa', 'holiday', 'off', 'leave'])
+                    && !$item->is_idt
+                    && !$item->is_ipc;
+            })->count(),
+
+            'total_work_minutes' => $myAttendances->filter(fn($i) => strtolower($i->status) === 'present')->sum('work_minutes'),
+            'total_late_minutes' => $totalLateMinutes,
+            'late_hours' => floor($totalLateMinutes / 60),
+            'late_minutes_remainder' => $totalLateMinutes % 60,
+
+            'total_early_leave_minutes' => $totalEarlyLeaveMinutes,
+            'early_leave_hours' => floor($totalEarlyLeaveMinutes / 60),
+            'early_leave_minutes_remainder' => $totalEarlyLeaveMinutes % 60,
+
+            'total_short_work_minutes' => $myAttendances->filter(function ($item) {
+                return (int) $item->short_work_minutes > 0
+                    && !in_array(strtolower($item->status), ['wfa', 'holiday', 'off', 'leave'])
+                    && !$item->is_idt
+                    && !$item->is_ipc;
+            })->sum('short_work_minutes'),
+        ];
+        // Selipkan baris ini sebelum return view
+        $summary = $cards;
+        // Tambahkan pengaman pencocokan nama untuk forgot check log
+        $summary['forgot_check_in'] = $cards['forgot_in'];
+        $summary['forgot_check_out'] = $cards['forgot_out'];
         return view('dashboard.employee', compact(
             'employee',
             'activeContract',
@@ -117,12 +252,20 @@ class DashboardController extends Controller
             'pendingLeaves',
             'approvedLeaves',
             'rejectedLeaves',
-            'dates',           // 🌟 Tambahan baru
-            'myAssignments',   // 🌟 Tambahan baru
-            'holidays',        // 🌟 Tambahan baru
-            'startDate',       // 🌟 Tambahan baru
-            'endDate'          // 🌟 Tambahan baru
-        ));
+            'dates',
+            'myAssignments',
+            'holidays',
+            'selectedYear',
+            'selectedMonth',
+            'summary',
+            'workingDays',
+            'calendarDays',
+            'sundayCount',
+            'holidayCount'
+        ))->with([
+                    'startDate' => $startDateInput,
+                    'endDate' => $endDateInput
+                ]);
     }
 
     public function adminDashboard()

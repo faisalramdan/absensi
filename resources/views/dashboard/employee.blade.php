@@ -64,6 +64,195 @@
                     </div>
                 </div>
 
+                <div class="col-xl-12 mb-4">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-transparent py-3">
+                           <form method="GET" action="{{ request()->url() }}" id="filterForm">
+                                <div class="row align-items-end g-3">
+
+                                    {{-- 1. Filter Tahun --}}
+                                    <div class="col-md-2">
+                                        <label class="form-label fw-semibold">Tahun Periode</label>
+                                        <select name="year" id="filterYear" class="form-select">
+                                            @for($y = date('Y'); $y >= date('Y') - 3; $y--)
+                                                <option value="{{ $y }}" @selected($selectedYear == $y)>{{ $y }}</option>
+                                            @endfor
+                                        </select>
+                                    </div>
+
+                                    {{-- 2. Filter Bulan --}}
+                                    <div class="col-md-2">
+                                        <label class="form-label fw-semibold">Bulan Periode</label>
+                                        <select name="month" id="filterMonth" class="form-select">
+                                            @foreach([
+                                                '01' => 'Januari', '02' => 'Februari', '03' => 'Maret', 
+                                                '04' => 'April', '05' => 'Mei', '06' => 'Juni', 
+                                                '07' => 'Juli', '08' => 'Agustus', '09' => 'September', 
+                                                '10' => 'Oktober', '11' => 'November', '12' => 'Desember'
+                                            ] as $num => $name)
+                                                <option value="{{ $num }}" @selected($selectedMonth == $num)>{{ $name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+
+                                    {{-- 3. Tanggal Start --}}
+                                    <div class="col-md-2">
+                                        <label class="form-label fw-semibold text-primary">Tanggal Start</label>
+                                        <input type="date" name="start_date" id="startDate" value="{{ $startDate }}" class="form-control border-primary-subtle">
+                                    </div>
+
+                                    {{-- 4. Tanggal End --}}
+                                    <div class="col-md-2">
+                                        <label class="form-label fw-semibold text-primary">Tanggal End</label>
+                                        <input type="date" name="end_date" id="endDate" value="{{ $endDate }}" class="form-control border-primary-subtle">
+                                    </div>
+                                    <div class="col-md-4 d-flex gap-2 mt-3">
+                                        <a href="{{ request()->url() }}" class="btn btn-secondary px-4">Reset</a>
+                                        <button type="submit" class="btn btn-primary px-4">Apply Filter</button>
+                                    </div>
+                                    
+
+                                    
+
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered align-middle mb-0">
+                                    <thead>
+                                        <tr class="bg-light text-muted small uppercase">
+                                            <th width="40%">Metrik / Status Kehadiran</th>
+                                            <th width="60%">Akumulasi Data & Keterangan Periode</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {{-- Status Utama Kehadiran --}}
+                                        <tr>
+                                            <th class="fw-semibold text-secondary">Status Kehadiran Utama</th>
+                                            <td>
+                                                <div class="d-flex flex-wrap gap-2">
+                                                    <span
+                                                        class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1.5 fw-semibold">
+                                                        Present: {{ number_format($summary['present'] ?? 0) }}
+                                                    </span>
+                                                    <span
+                                                        class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1.5 fw-semibold">
+                                                        WFA: {{ number_format($summary['wfa'] ?? 0) }}
+                                                    </span>
+                                                    <span
+                                                        class="badge bg-info-subtle text-info border border-info-subtle px-2 py-1.5 fw-semibold">
+                                                        Sakit: {{ number_format($summary['sakit'] ?? 0) }}
+                                                    </span>
+                                                    <span
+                                                        class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1.5 fw-semibold">
+                                                        Ijin: {{ number_format($summary['ijin'] ?? 0) }}
+                                                    </span>
+                                                    <span
+                                                        class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1.5 fw-semibold">
+                                                        Alpha: {{ number_format($summary['alpha'] ?? 0) }}
+                                                    </span>
+                                                    <span class="badge px-2 py-1.5 fw-semibold border"
+                                                        style="background-color: #f3e5f5; color: #8e24aa; border-color: #d1c4e9 !important;">
+                                                        Cuti: {{ number_format($summary['cuti'] ?? 0) }}
+                                                    </span>
+                                                    <span class="badge px-2 py-1.5 fw-semibold border"
+                                                        style="background-color: #e8eaf6; color: #3f51b5; border-color: #c5cae9 !important;">
+                                                        IDT: {{ number_format($summary['idt'] ?? 0) }}
+                                                    </span>
+                                                    <span class="badge px-2 py-1.5 fw-semibold border"
+                                                        style="background-color: #e0f2f1; color: #00796b; border-color: #b2dfdb !important;">
+                                                        IPC: {{ number_format($summary['ipc'] ?? 0) }}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                        </tr>
+
+                                        {{-- Pelanggaran Waktu Masuk --}}
+                                        <tr>
+                                            <th class="fw-semibold text-secondary">Keterlambatan (Late)</th>
+                                            <td>
+                                                <span
+                                                    class="fw-bold text-warning">{{ number_format($summary['late'] ?? 0) }}
+                                                    Kali</span>
+                                                @if(($summary['total_late_minutes'] ?? 0) > 0)
+                                                    <span class="text-muted small ms-2">
+                                                        (Total durasi: {{ $summary['late_hours'] ?? 0 }} Jam
+                                                        {{ $summary['late_minutes_remainder'] ?? 0 }} Menit)
+                                                    </span>
+                                                @endif
+                                            </td>
+                                        </tr>
+
+                                        {{-- Pelanggaran Waktu Pulang --}}
+                                        <tr>
+                                            <th class="fw-semibold text-secondary">Pulang Cepat (Early Leave)</th>
+                                            <td>
+                                                <span class="fw-bold"
+                                                    style="color: #00796b;">{{ number_format($summary['early_leave'] ?? 0) }}
+                                                    Kali</span>
+                                                @if(($summary['total_early_leave_minutes'] ?? 0) > 0)
+                                                    <span class="text-muted small ms-2">
+                                                        (Total durasi: {{ $summary['early_leave_hours'] ?? 0 }} Jam
+                                                        {{ $summary['early_leave_minutes_remainder'] ?? 0 }} Menit)
+                                                    </span>
+                                                @endif
+                                            </td>
+                                        </tr>
+
+                                        {{-- Kelalaian Absen --}}
+                                        <tr>
+                                            <th class="fw-semibold text-secondary">Kelalaian Log Absensi</th>
+                                            <td>
+                                                <span class="text-danger fw-medium">
+                                                    Lupa Check-In: <strong>{{ $summary['forgot_check_in'] ?? 0 }}</strong>
+                                                    <span class="text-muted mx-2">|</span>
+                                                    Lupa Check-Out: <strong>{{ $summary['forgot_check_out'] ?? 0 }}</strong>
+                                                </span>
+                                            </td>
+                                        </tr>
+
+                                        {{-- Hari Kerja --}}
+                                        <tr>
+                                            <th class="fw-semibold text-secondary">Hari Kerja Resmi</th>
+                                            <td class="text-dark fw-medium">
+                                                {{ $workingDays ?? 0 }} Hari Kerja
+                                                <span class="text-muted small fw-normal ms-2">
+                                                    (Dari {{ $calendarDays ?? 0 }} hari kalender - {{ $sundayCount ?? 0 }}
+                                                    Off - {{ $holidayCount ?? 0 }} Libur)
+                                                </span>
+                                            </td>
+                                        </tr>
+
+                                        {{-- Akumulasi Kurang Jam Kerja --}}
+                                        <tr class="table-light">
+                                            <th class="fw-medium text-secondary">Kurang dari jam kerja</th>
+                                            <td class="fw-bold text-dark">
+                                                {{ $summary['short_work_count'] ?? 0 }}x
+                                            </td>
+                                        </tr>
+                                        <tr class="table-danger">
+                                            <th class="fw-bold text-danger">Total kurang jam kerja</th>
+                                            <td class="fs-5 fw-bold text-danger">
+                                                @if(isset($summary['total_short_work_minutes']) && $summary['total_short_work_minutes'] > 0)
+                                                    {{ floor($summary['total_short_work_minutes'] / 60) }} <small
+                                                        class="fs-6 fw-normal">Jam</small>
+                                                    {{ $summary['total_short_work_minutes'] % 60 }} <small
+                                                        class="fs-6 fw-normal">Menit</small>
+                                                @else
+                                                    0 <small class="fs-6 fw-normal">Jam</small> 0 <small
+                                                        class="fs-6 fw-normal">Menit</small>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 {{-- 🌟 FITUR BARU: Tabel Jadwal Kerja Saya (Statis & Read-Only) 🌟 --}}
                 <div class="card border-0 shadow-sm mb-4">
                     <div class="card-header bg-white py-3 border-bottom">
@@ -206,16 +395,65 @@
     </div>
 
     @push('scripts')
-        <script>
-            document.addEventListener('DOMContentLoaded', function () {
-                var calendarEl = document.getElementById('user-calendar');
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // ==========================================
+            // 1. LOGIKA INTERAKTIF DROPDOWN FILTER DATA
+            // ==========================================
+            const filterYear = document.getElementById('filterYear');
+            const filterMonth = document.getElementById('filterMonth');
+            const startDateInput = document.getElementById('startDate');
+            const endDateInput = document.getElementById('endDate');
 
+            if (filterYear && filterMonth && startDateInput && endDateInput) {
+                function updateDateRange() {
+                    const year = parseInt(filterYear.value);
+                    const month = parseInt(filterMonth.value);
+
+                    if (!year || !month) return;
+
+                    // Buat tanggal target: tanggal 1 dari bulan & tahun terpilih
+                    let targetDate = new Date(year, month - 1, 1);
+
+                    // Cari tanggal 26 dari 1 bulan sebelumnya
+                    let startPeriod = new Date(targetDate.getFullYear(), targetDate.getMonth() - 1, 26);
+                    
+                    // Cari tanggal 25 di bulan terpilih
+                    let endPeriod = new Date(targetDate.getFullYear(), targetDate.getMonth(), 25);
+
+                    // Helper memformat date objek ke string YYYY-MM-DD lokal
+                    const formatDate = (date) => {
+                        const d = new Date(date);
+                        let m = '' + (d.getMonth() + 1);
+                        let day = '' + d.getDate();
+                        const y = d.getFullYear();
+
+                        if (m.length < 2) m = '0' + m;
+                        if (day.length < 2) day = '0' + day;
+
+                        return [y, m, day].join('-');
+                    };
+
+                    startDateInput.value = formatDate(startPeriod);
+                    endDateInput.value = formatDate(endPeriod);
+                }
+
+                // Trigger pembaruan otomatis saat dropdown berubah
+                filterYear.addEventListener('change', updateDateRange);
+                filterMonth.addEventListener('change', updateDateRange);
+            }
+
+            // ==========================================
+            // 2. LOGIKA INITIALISASI FULLCALENDAR
+            // ==========================================
+            var calendarEl = document.getElementById('user-calendar');
+
+            if (calendarEl) {
                 var calendar = new FullCalendar.Calendar(calendarEl, {
-                    tthemeSystem: 'bootstrap',
+                    themeSystem: 'bootstrap', // FIX: Typo dari tthemeSystem sebelumnya
                     initialView: 'dayGridMonth',
                     firstDay: 1,
 
-                    // 🌟 UBAH / TAMBAHKAN BAGIAN INI 🌟
                     buttonText: {
                         today: 'Today',
                         prev: 'Prev', // Memaksa menampilkan teks 'Prev' daripada ikon panah
@@ -248,7 +486,8 @@
 
                 // Menyalakan sistem kalendarnya
                 calendar.render();
-            });
-        </script>
-    @endpush
+            }
+        });
+    </script>
+@endpush
 @endsection
