@@ -85,7 +85,7 @@
                                                             <span
                                                                 class="text-dark fw-medium"></span>{{ $role->updater?->name ?? '-' }}</span><br>
                                                             <small
-                                                                class="text-muted">{{ $role->updated_at->format('d M Y H:i:s') }}</small>
+                                                                class="text-muted">{{ $role->updated_at?->format('d M Y H:i:s') }}</small>
 
                                                         </div>
                                                     </td>
