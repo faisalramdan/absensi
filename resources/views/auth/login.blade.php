@@ -58,11 +58,13 @@
                                 <div class="auth-logo mb-4">
 
                                     <a href="index.html" class="logo-dark">
-                                        <img src="{{ asset('assets/images/logo.png') }}" height="75" alt="logo dark">
+                                        <img src="{{ asset('assets/images/hris_logo_white.png') }}" height="75"
+                                            alt="logo dark">
                                     </a>
 
                                     <a href="index.html" class="logo-light">
-                                        <img src="{{ asset('assets/images/logo.png') }}" height="75" alt="logo light">
+                                        <img src="{{ asset('assets/images/hris_logo_white.png') }}" height="75"
+                                            alt="logo light">
                                     </a>
                                 </div>
 

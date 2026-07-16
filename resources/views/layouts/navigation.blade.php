@@ -3,13 +3,17 @@
     <div class="main-nav">
         <div class="logo-box">
             <a href="{{ route('dashboard') }}" class="logo-dark">
-                <img src="{{ asset('assets/images/logo_white.png') }}" class="logo-sm" alt="logo sm">
-                <img src="{{ asset('assets/images/logo_white.png') }}" class="logo-lg" alt="logo dark">
+                <img src="{{ asset('assets/images/hris_logo_white.png') }}" class="logo-sm" alt="logo sm"
+                    style="height: 353px; width: auto;">
+                <img src="{{ asset('assets/images/hris_logo_white.png') }}" class="logo-lg" alt="logo dark"
+                    style="width: 250px; height: 75px; object-fit: contain;">
             </a>
 
             <a href="{{ route('dashboard') }}" class="logo-light">
-                <img src="{{ asset('assets/images/logo_white.png') }}" class="logo-sm" alt="logo sm">
-                <img src="{{ asset('assets/images/logo_white.png') }}" class="logo-lg" alt="logo light">
+                <img src="{{ asset('assets/images/hris_logo_white.png') }}" class="logo-sm" alt="logo sm"
+                    style="height: 353px; width: auto;">
+                <img src="{{ asset('assets/images/hris_logo_white.png') }}" class="logo-lg" alt="logo light"
+                    style="width: 250px; height: 75px; object-fit: contain;">
             </a>
         </div>
 
