@@ -304,7 +304,32 @@ Route::middleware('auth')->group(function () {
 
 
 });
+Route::get('/fix-akses', function () {
+    try {
+        // 1. Bersihkan cache Spatie Permission
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
+        // 2. Buat role 'admin' & 'super-admin' (berjaga-jaga mana yang dipakai sistem Anda)
+        $roleAdmin = \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'admin']);
+        $roleSuper = \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'super-admin']);
+
+        // 3. Ambil SEMUA permission yang tadi kita buat di seeder, tempel ke role tersebut
+        $permissions = \Spatie\Permission\Models\Permission::all();
+        $roleAdmin->syncPermissions($permissions);
+        $roleSuper->syncPermissions($permissions);
+
+        // 4. Cari akun Anda (ID 1) dan jadikan dia admin
+        $user = \App\Models\User::find(1);
+        if ($user) {
+            $user->assignRole($roleAdmin);
+            $user->assignRole($roleSuper);
+        }
+
+        return 'Berhasil! Cache bersih & Semua hak akses telah diberikan ke Admin. Silakan kembali ke web.';
+    } catch (\Exception $e) {
+        return 'Error: ' . $e->getMessage();
+    }
+});
 
 
 require __DIR__ . '/auth.php';
