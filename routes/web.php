@@ -54,6 +54,8 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
+    Route::put('/profile/update-photo', [ProfileController::class, 'updatePhoto'])->name('profile.update-photo');
+
     Route::resource('roles', RoleController::class)->middleware('permission:role.view');
     Route::resource('permissions', PermissionController::class);
     Route::resource('users', UserController::class)->middleware('permission:user.view');

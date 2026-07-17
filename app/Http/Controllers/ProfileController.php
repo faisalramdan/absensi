@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\View\View;
 use App\Helpers\ActivityLogger;
+use Illuminate\Support\Facades\Storage;
 
 class ProfileController extends Controller
 {
@@ -98,4 +99,35 @@ class ProfileController extends Controller
 
         return Redirect::to('/');
     }
+
+    public function updatePhoto(Request $request)
+    {
+        $request->validate([
+            'photo' => 'required|image|mimes:jpeg,png,jpg|max:2048', // Maksimal 2MB
+        ], [
+            'photo.image' => 'File harus berupa gambar.',
+            'photo.mimes' => 'Format gambar harus jpeg, png, atau jpg.',
+            'photo.max' => 'Ukuran gambar maksimal 2MB.',
+        ]);
+
+        $employee = Auth::user()->employee; // Sesuaikan dengan relasi user ke karyawan Anda
+
+        if ($request->hasFile('photo')) {
+            // Hapus foto lama jika ada dan bukan avatar default
+            if ($employee->photo && Storage::disk('public')->exists($employee->photo)) {
+                Storage::disk('public')->delete($employee->photo);
+            }
+
+            // Simpan foto baru ke folder storage/app/public/employee-photos
+            $path = $request->file('photo')->store('employee-photos', 'public');
+
+            // Update database
+            $employee->update([
+                'photo' => $path
+            ]);
+        }
+
+        return back()->with('success', 'Foto profil berhasil diperbarui!');
+    }
+
 }

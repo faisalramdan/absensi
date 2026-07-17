@@ -168,47 +168,52 @@
                                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                    <span class="d-flex align-items-center">
                                         @php
-                                             $nameParts = explode(' ', auth()->user()->name);
-                                             $initials = '';
+                                             $user = auth()->user();
+                                             $employee = $user->employee; // Mengambil relasi karyawan
+                                             $hasPhoto = !empty($employee?->photo); // Cek apakah ada foto
 
+                                             // Membuat inisial sebagai fallback (cadangan)
+                                             $nameParts = explode(' ', $user->name);
+                                             $initials = '';
                                              foreach ($nameParts as $part) {
                                                   $initials .= strtoupper(substr($part, 0, 1));
                                              }
-
                                              $initials = substr($initials, 0, 2);
                                         @endphp
 
-
-                                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center"
-                                             style="width:32px;height:32px;font-size:14px;font-weight:600;">
-                                             {{ $initials }}
-                                        </div>
+                                        {{-- Kondisi: Tampilkan Foto jika ada, jika tidak tampilkan Inisial --}}
+                                        @if($hasPhoto)
+                                             <img src="{{ asset('storage/' . $employee->photo) }}" alt="{{ $user->name }}"
+                                                  class="rounded-circle object-fit-cover shadow-sm"
+                                                  style="width: 32px; height: 32px;">
+                                        @else
+                                             <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center shadow-sm"
+                                                  style="width:32px;height:32px;font-size:14px;font-weight:600;">
+                                                  {{ $initials }}
+                                             </div>
+                                        @endif
                                    </span>
                               </a>
+
                               <div class="dropdown-menu dropdown-menu-end">
-                                   <!-- item-->
                                    @auth
                                         <h6 class="dropdown-header">
                                              {{ auth()->user()->name }}!
                                         </h6>
                                    @endauth
                                    <a class="dropdown-item" href="{{ route('profile.edit') }}">
-                                        <i class="bx bx-user-circle text-muted fs-18 align-middle me-1"></i><span
-                                             class="align-middle">Profil</span>
+                                        <i class="bx bx-user-circle text-muted fs-18 align-middle me-1"></i>
+                                        <span class="align-middle">Profil</span>
                                    </a>
-
 
                                    <div class="dropdown-divider my-1"></div>
 
                                    <form method="POST" action="{{ route('logout') }}">
                                         @csrf
-
                                         <a href="{{ route('logout') }}" class="dropdown-item text-danger"
                                              onclick="event.preventDefault(); this.closest('form').submit();">
-
                                              <i class="bx bx-log-out fs-18 align-middle me-1"></i>
                                              <span class="align-middle">Keluar dari sistem</span>
-
                                         </a>
                                    </form>
                               </div>

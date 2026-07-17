@@ -13,10 +13,40 @@
                                     {{-- Photo --}}
                                     <div class="col-lg-2 text-lg-center">
                                         <div class="bg-body d-flex align-items-center justify-content-center rounded py-4">
-                                            <img src="{{ !empty($employee?->photo) ? asset('storage/' . $employee->photo) : asset('images/default-avatar.png') }}"
-                                                alt="{{ $employee->full_name }}"
-                                                class="avatar-xxl rounded-circle object-fit-cover">
+
+                                            {{-- Form Upload Foto --}}
+                                            <form action="{{ route('profile.update-photo') }}" method="POST"
+                                                enctype="multipart/form-data" id="photoForm">
+                                                @csrf
+                                                @method('PUT')
+
+                                                <div class="position-relative d-inline-block">
+                                                    {{-- Foto Profil --}}
+                                                    <img src="{{ !empty($employee?->photo) ? asset('storage/' . $employee->photo) : asset('images/default-avatar.png') }}"
+                                                        alt="{{ $employee->full_name }}"
+                                                        class="avatar-xxl rounded-circle object-fit-cover shadow-sm border border-3 border-white"
+                                                        id="profileImagePreview">
+
+                                                    {{-- Tombol Edit Kamera --}}
+                                                    <label for="photoInput"
+                                                        class="position-absolute bottom-0 end-0 bg-primary text-white rounded-circle shadow"
+                                                        style="cursor: pointer; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; transform: translate(10%, 10%);">
+                                                        <iconify-icon icon="solar:camera-add-bold"
+                                                            class="fs-18"></iconify-icon>
+                                                    </label>
+
+                                                    {{-- Input File Hidden --}}
+                                                    <input type="file" id="photoInput" name="photo" class="d-none"
+                                                        accept="image/jpeg,image/png,image/jpg" onchange="submitPhoto()">
+                                                </div>
+                                            </form>
+
                                         </div>
+
+                                        {{-- Tampilkan Error jika file kebesaran/bukan gambar --}}
+                                        @error('photo')
+                                            <small class="text-danger mt-2 d-block">{{ $message }}</small>
+                                        @enderror
 
                                         <div class="mt-3">
                                             @if($employee->is_active)
@@ -171,102 +201,11 @@
                                     <h4 class="card-title">About</h4>
                                 </div>
                                 <div class="card-body">
-                                    <p>I'm the model of the new Project Head Manager. I've combined a deep background in
-                                        brand management at blue chip CPG companies with eCommerce growth marketing at the
-                                        world's biggest retailer. I've run SingleFire I've created world-class campaigns;
-                                        I've built digital marketing organizations from the ground up. I have over 20 years'
-                                        experience leading... <a href="#!" class="text-primary">See more</a></p>
-                                    <h4 class="card-title mb-2">My Approach :</h4>
-                                    <p>When it comes to Project Head Manager, I believe in a holistic approach that combines
-                                        creativity with technical expertise. I start by understanding your unique vision and
-                                        goals, then work tirelessly to bring that vision to life. Whether you need a sleek
-                                        portfolio site, an engaging e-commerce platform, or anything in between, I've got
-                                        you covered.</p>
-                                    <div class="row g-2 mt-2 mb-4">
-                                        <div class="col-lg-6">
-                                            <div class="border p-3 rounded">
-                                                <h4 class="card-title">Marketing expertise</h4>
-                                                <div class="d-flex gap-2 flex-wrap mt-3">
-                                                    <span
-                                                        class="badge bg-body text-muted px-2 py-1 fs-12">#Leadership</span>
-                                                    <span
-                                                        class="badge bg-body text-muted px-2 py-1 fs-12">#Advertising</span>
-                                                    <span
-                                                        class="badge bg-body text-muted px-2 py-1 fs-12">#Public-relations</span>
-                                                    <span
-                                                        class="badge bg-body text-muted px-2 py-1 fs-12">#Branding-manage</span>
-                                                </div>
-                                                <p class="mb-0 text-dark mt-3">Open to networking :<span
-                                                        class="badge bg-success-subtle text-success ms-1">Yes</span></p>
-                                            </div>
-                                        </div>
-                                        <div class="col-lg-6">
-                                            <div class="border p-3 rounded">
-                                                <h4 class="card-title">Marketing interests</h4>
-                                                <div class="d-flex gap-2 flex-wrap mt-3">
-                                                    <span
-                                                        class="badge bg-body text-muted px-2 py-1 fs-12">#Event-marketing</span>
-                                                    <span
-                                                        class="badge bg-body text-muted px-2 py-1 fs-12">#Performance-marketing</span>
-                                                    <span
-                                                        class="badge bg-body text-muted px-2 py-1 fs-12">#Account-based-marketing</span>
-                                                </div>
-                                                <p class="mb-0 text-dark mt-3">Open to advising :<span
-                                                        class="badge bg-success-subtle text-success ms-1">Yes</span></p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <h4 class="card-title">My Core Skills :</h4>
-                                    <div class="row mt-2">
-                                        <div class="col-lg-4">
-                                            <div class="d-flex align-items-center justify-content-satrt gap-2">
-                                                <ul class="d-flex text-warning m-0 fs-20 list-unstyled">
-                                                    <li>
-                                                        <i class="bx bxs-star"></i>
-                                                    </li>
-                                                    <li>
-                                                        <i class="bx bxs-star"></i>
-                                                    </li>
-                                                    <li>
-                                                        <i class="bx bxs-star"></i>
-                                                    </li>
-                                                    <li>
-                                                        <i class="bx bxs-star"></i>
-                                                    </li>
-                                                </ul>
-                                                <p class="fw-medium mb-0 text-dark fs-15">Inbound Marketing</p>
-                                            </div>
-                                        </div>
-                                        <div class="col-lg-4">
-                                            <div class="d-flex align-items-center justify-content-satrt gap-2">
-                                                <ul class="d-flex text-warning m-0 fs-20 list-unstyled">
-                                                    <li>
-                                                        <i class="bx bxs-star"></i>
-                                                    </li>
-                                                    <li>
-                                                        <i class="bx bxs-star"></i>
-                                                    </li>
-                                                    <li>
-                                                        <i class="bx bxs-star"></i>
-                                                    </li>
-                                                </ul>
-                                                <p class="fw-medium mb-0 text-dark fs-15">Entrepreneurship</p>
-                                            </div>
-                                        </div>
-                                        <div class="col-lg-4">
-                                            <div class="d-flex align-items-center justify-content-satrt gap-2">
-                                                <ul class="d-flex text-warning m-0 fs-20 list-unstyled">
-                                                    <li>
-                                                        <i class="bx bxs-star"></i>
-                                                    </li>
-                                                    <li>
-                                                        <i class="bx bxs-star"></i>
-                                                    </li>
-                                                </ul>
-                                                <p class="fw-medium mb-0 text-dark fs-15">Growth Marketing</p>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <p>"Halo! Profil saya masih dalam tahap penyempurnaan dan belum ada informasi yang
+                                        ditambahkan di sini. Tapi jangan ragu untuk menyapa jika kita berpapasan. Saya
+                                        selalu terbuka untuk diskusi baru, bertukar ide, dan kolaborasi yang seru!" <a
+                                            href="#!" class="text-primary">See more</a></p>
+
                                 </div>
                             </div>
                         </div>
@@ -406,8 +345,10 @@
         </div>
     </div>
     </div>
+
+
     <script>
-        // Password toggle functionality
+        // Password toggle functionality (kode lama biarkan)
         function togglePassword(fieldId) {
             const field = document.getElementById(fieldId);
             const icon = document.getElementById(fieldId + '-icon');
@@ -419,6 +360,17 @@
                 field.type = 'password';
                 icon.setAttribute('icon', 'solar:eye-bold');
             }
-        } 
+        }
+
+        // Fungsi baru untuk submit otomatis saat foto dipilih
+        function submitPhoto() {
+            const fileInput = document.getElementById('photoInput');
+            const form = document.getElementById('photoForm');
+
+            if (fileInput.files && fileInput.files[0]) {
+                // Submit form ke server
+                form.submit();
+            }
+        }
     </script>
 @endsection
