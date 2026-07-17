@@ -27,47 +27,54 @@
                 @endif
                 <!-- endinfo -->
 
-                <!-- Advanced Filters -->
                 <div class="card border-0 shadow-sm mb-4">
-
                     <div class="card-header d-flex align-items-center">
-                        <iconify-icon icon="solar:filter-bold-duotone" class="text-primary me-2 fs-20">
-                        </iconify-icon>
-
+                        <iconify-icon icon="solar:filter-bold-duotone" class="text-primary me-2 fs-20"></iconify-icon>
                         <h5 class="mb-0 fw-semibold">
                             Filter Karyawan
                         </h5>
                     </div>
 
                     <div class="card-body">
-
                         <form method="GET" action="{{ route('employees.index') }}">
                             <div class="row g-3">
 
+                                {{-- 1. Kolom Pencarian --}}
                                 <div class="col-md-4">
-
                                     <label class="form-label fw-semibold">
                                         Cari Nama Karyawan atau NIK
                                     </label>
-
                                     <div class="input-group">
                                         <span class="input-group-text">
-                                            <iconify-icon icon="solar:magnifer-bold-duotone">
-                                            </iconify-icon>
+                                            <iconify-icon icon="solar:magnifer-bold-duotone"></iconify-icon>
                                         </span>
                                         <input type="text" name="search" class="form-control" placeholder="Nama atau NIK..."
                                             value="{{ request('search') }}">
                                     </div>
-
                                 </div>
+
+                                {{-- 2. Kolom Filter Company --}}
+                                <div class="col-md-3">
+                                    <label class="form-label fw-semibold">
+                                        Perusahaan
+                                    </label>
+                                    <select name="company_id" class="form-select">
+                                        <option value="">Semua Perusahaan</option>
+                                        @foreach($companies as $company)
+                                            <option value="{{ $company->id }}" {{ request('company_id') == $company->id ? 'selected' : '' }}>
+                                                {{ $company->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                {{-- 3. Kolom Filter Status --}}
                                 <div class="col-md-3">
                                     <label class="form-label fw-semibold">
                                         Status Karyawan
                                     </label>
-
                                     <select name="employee_status_id" class="form-select">
                                         <option value="">Semua Status</option>
-
                                         @foreach($employeeStatuses as $status)
                                             <option value="{{ $status->id }}" {{ request('employee_status_id') == $status->id ? 'selected' : '' }}>
                                                 {{ $status->name }}
@@ -76,34 +83,22 @@
                                     </select>
                                 </div>
 
-                                {{-- Button --}}
+                                {{-- 4. Kolom Tombol --}}
                                 <div class="col-md-2">
-
-                                    <label class="form-label d-block">
-                                        &nbsp;
-                                    </label>
-
+                                    <label class="form-label d-block">&nbsp;</label>
                                     <div class="d-flex gap-2">
-
                                         <button type="submit" class="btn btn-primary">
                                             Filter
                                         </button>
-
                                         <a href="{{ route('employees.index') }}" class="btn btn-secondary">
                                             Reset
                                         </a>
-
                                     </div>
-
                                 </div>
 
                             </div>
-
-
                         </form>
-
                     </div>
-
                 </div>
 
                 <div class="row">

@@ -6,7 +6,7 @@ use App\Models\Employee;
 use App\Models\Company;
 use App\Models\Position;
 use App\Models\EmployeeStatus;
-use App\Models\emergencyContact;
+use App\Models\EmergencyContact;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
@@ -21,23 +21,34 @@ class EmployeeController extends Controller
     {
         $employeeStatuses = EmployeeStatus::orderBy('name')->get();
 
+        // TAMBAHKAN INI: Ambil data company untuk di-passing ke dropdown
+        $companies = Company::where('is_active', true)->orderBy('name')->get();
+
         $employees = Employee::query();
 
+        // Filter Pencarian
         if ($request->filled('search')) {
             $employees->where(function ($q) use ($request) {
-                $q->where('nik', 'ILIKE', '%' . $request->search . '%')
-                    ->orWhere('full_name', 'ILIKE', '%' . $request->search . '%')
-                    ->orWhere('email', 'ILIKE', '%' . $request->search . '%');
+                $q->where('nik', 'like', '%' . $request->search . '%')
+                    ->orWhere('full_name', 'like', '%' . $request->search . '%')
+                    ->orWhere('email', 'like', '%' . $request->search . '%');
             });
         }
 
+        // TAMBAHKAN INI: Filter Berdasarkan Company
+        if ($request->filled('company_id')) {
+            $employees->where('company_id', $request->company_id);
+        }
 
-        // Filter Aktif / Non Aktif
+        // Filter Status Karyawan (Pastikan namanya sesuai dengan name di HTML)
+        if ($request->filled('employee_status_id')) {
+            $employees->where('status_id', $request->employee_status_id);
+            // Catatan: sesuaikan 'status_id' dengan nama kolom status di tabel employee Anda
+        }
+
+        // Filter Aktif / Non Aktif (Jika masih Anda gunakan)
         if ($request->filled('status')) {
-            $employees->where(
-                'is_active',
-                $request->status
-            );
+            $employees->where('is_active', $request->status);
         }
 
         $employees = $employees
@@ -55,7 +66,8 @@ class EmployeeController extends Controller
 
         return view(
             'employees.index',
-            compact('employees', 'employeeStatuses')
+            // TAMBAHKAN INI: Pastikan 'companies' ikut dikirim ke view (compact)
+            compact('employees', 'employeeStatuses', 'companies')
         );
     }
 
