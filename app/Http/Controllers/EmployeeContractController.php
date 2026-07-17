@@ -74,13 +74,6 @@ class EmployeeContractController extends Controller
 
         return view('employee-contracts.create', compact('employees', 'statuses'));
     }
-
-    /**
-     * Store a newly created resource in storage.
-     */
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
         $request->validate([

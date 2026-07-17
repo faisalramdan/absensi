@@ -30,19 +30,7 @@
                                     @csrf
 
                                     <div class="row g-4">
-                                        <div class="col-md-12">
-                                            <label class="form-label fw-semibold">Pilih Karyawan Yang Belum Punya Jadwal
-                                                <span class="text-danger">*</span></label>
-                                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                                <small class="text-muted" id="employee_count_info">Memuat daftar
-                                                    karyawan...</small>
-                                                <button type="button" class="btn btn-sm btn-light-primary py-0 px-2 fs-12"
-                                                    id="btn-select-all">Pilih Semua Karyawan</button>
-                                            </div>
-                                            <select name="employee_ids[]" id="employee_select" class="form-select"
-                                                style="height: 200px;" multiple required>
-                                            </select>
-                                        </div>
+
 
                                         <div class="col-md-4">
                                             <label class="form-label fw-semibold">Pilih Shift Kerja <span
@@ -120,6 +108,20 @@
                                             </div>
                                             <small class="text-muted d-block mt-1 fs-12">Jika tidak dicentang, sistem secara
                                                 otomatis akan melewati (skip) hari tersebut.</small>
+                                        </div>
+
+                                        <div class="col-md-12">
+                                            <label class="form-label fw-semibold">Pilih Karyawan Yang Belum Punya Jadwal
+                                                <span class="text-danger">*</span></label>
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <small class="text-muted" id="employee_count_info">Memuat daftar
+                                                    karyawan...</small>
+                                                <button type="button" class="btn btn-sm btn-light-primary py-0 px-2 fs-12"
+                                                    id="btn-select-all">Pilih Semua Karyawan</button>
+                                            </div>
+                                            <select name="employee_ids[]" id="employee_select" class="form-select"
+                                                style="height: 200px;" multiple required>
+                                            </select>
                                         </div>
 
                                         <div class="col-md-12">
@@ -209,7 +211,7 @@
                         data.forEach(emp => {
                             const option = document.createElement('option');
                             option.value = emp.id;
-                            option.textContent = `${emp.full_name} (${emp.employee_code || '-'})`;
+                            option.textContent = `${emp.full_name} (${emp.nik || '-'})`;
                             employeeSelect.appendChild(option);
                         });
                     })
