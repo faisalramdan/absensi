@@ -466,7 +466,7 @@
                             </span>
                             {{ $attendances->withQueryString()->links() }}
                         </div>
-                    </div>
+                    </div> 
                 </div>
 
             </div>
