@@ -51,13 +51,14 @@ class LeaveRequestController extends Controller
         // 1. Ambil data karyawan yang sedang login
         $employee = auth()->user()->employee;
 
+
         if (!$employee) {
             return redirect()->back()->with('error', 'Gagal memuat formulir. Akun Anda belum terhubung dengan data Karyawan.');
         }
 
         // 2. Ambil data kontrak karyawan yang saat ini statusnya Aktif ('t') yang terbaru
         $activeContract = \App\Models\EmployeeContract::where('employee_id', $employee->id)
-            ->where('is_active', 't')
+            ->where('is_active', true)
             ->latest()
             ->first();
 
@@ -69,6 +70,7 @@ class LeaveRequestController extends Controller
         } else {
             $leaveAllocations = collect();
         }
+
 
         // 4. Lempar variabel ke view blade leave-requests/create.blade.php
         return view(
@@ -101,7 +103,7 @@ class LeaveRequestController extends Controller
 
         // 1. Cari kontrak aktif karyawan ini untuk mencocokkan alokasi cutinya
         $activeContract = \App\Models\EmployeeContract::where('employee_id', $employee->id)
-            ->where('is_active', 't')
+            ->where('is_active', true)
             ->latest()
             ->first();
 
@@ -468,7 +470,7 @@ class LeaveRequestController extends Controller
         try {
             // 1. Cari kontrak aktif milik karyawan yang mengajukan cuti
             $activeContract = \App\Models\EmployeeContract::where('employee_id', $leaveRequest->employee_id)
-                ->where('is_active', 't')
+                ->where('is_active', true)
                 ->latest()
                 ->first();
 
