@@ -44,12 +44,13 @@
                                             <select name="leave_type_id" class="form-select" required>
                                                 <option value="">Pilih</option>
 
-                                                {{-- Mengubah looping dari master LeaveType menjadi dari LeaveAllocation karyawan --}}
+                                                {{-- Mengubah looping dari master LeaveType menjadi dari LeaveAllocation
+                                                karyawan --}}
                                                 @foreach($leaveAllocations ?? [] as $allocation)
                                                     @php
                                                         // Mengambil model leaveType dari relasi allocation
                                                         $leaveType = $allocation->leaveType;
-                                                        
+
                                                         // Menghilangkan desimal .00 menggunakan floatval
                                                         $remaining = floatval($allocation->remaining_days);
                                                         $allocated = floatval($allocation->allocated_days);
@@ -58,9 +59,9 @@
                                                     @if($leaveType)
                                                         {{-- Hanya memunculkan jika jatah cuti masih ada atau bisa diajukan --}}
                                                         <option value="{{ $leaveType->id }}" {{ $remaining <= 0 ? 'disabled class=text-muted' : '' }}>
-                                                            {{ $leaveType->name }} 
+                                                            {{ $leaveType->name }}
                                                             (Sisa {{ $remaining }} / {{ $allocated }} Hari)
-                                                            
+
                                                             @if($remaining <= 0)
                                                                 - [Kuota Habis]
                                                             @endif
@@ -77,7 +78,7 @@
                                                 <span class="text-danger">*</span>
                                             </label>
 
-                                            <input type="date" name="start_date" min="{{ date('Y-m-d') }}" value="{{ old('start_date') }}"
+                                            <input type="date" name="start_date" value="{{ old('start_date') }}"
                                                 class="form-control" required>
                                         </div>
 
@@ -87,7 +88,7 @@
                                                 <span class="text-danger">*</span>
                                             </label>
 
-                                            <input type="date" name="end_date" min="{{ date('Y-m-d') }}" value="{{ old('end_date') }}"
+                                            <input type="date" name="end_date" value="{{ old('end_date') }}"
                                                 class="form-control" required>
                                         </div>
 

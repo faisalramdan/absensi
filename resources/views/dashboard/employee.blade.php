@@ -253,6 +253,162 @@
                     </div>
                 </div>
 
+                {{-- TABEL RIWAYAT ABSENSI SAYA (LOG ABSEN) --}}
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                        <h4 class="card-title mb-0 fw-bold text-dark">
+                            <iconify-icon icon="solar:history-bold-duotone"
+                                class="align-middle me-1 text-primary fs-20"></iconify-icon>
+                            Riwayat Absensi Saya
+                        </h4>
+                        <span class="badge bg-primary-subtle text-primary">
+                            {{ $attendances->total() }} Data Ditemukan
+                        </span>
+                    </div>
+
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="ps-4">Tanggal</th>
+                                        <th>Shift</th>
+                                        <th>Check-In</th>
+                                        <th>Check-Out</th>
+                                        <th>Keterlambatan</th>
+                                        <th>Pulang Cepat</th>
+                                        <th>Total Jam Kerja</th>
+                                        <th>Status</th>
+                                        <th class="pe-4 text-center">Metode</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($attendances as $attendance)
+                                        <tr>
+                                            <td class="ps-4">
+                                                <span class="text-muted small d-block mb-1">
+                                                    {{ \Carbon\Carbon::parse($attendance->date)->translatedFormat('l') }}
+                                                </span>
+                                                <span class="fw-semibold text-dark">
+                                                    {{ \Carbon\Carbon::parse($attendance->date)->translatedFormat('d M Y') }}
+                                                </span>
+                                            </td>
+                                            
+                                            <td>
+                                                @php
+                                                    $shiftName = $attendance->shift?->name ?? '-';
+                                                    $badgeClass = 'bg-light text-muted'; 
+                                                    if (str_contains(strtolower($shiftName), 'siang')) {
+                                                        $badgeClass = 'bg-primary text-white';
+                                                    } elseif (str_contains(strtolower($shiftName), 'pagi')) {
+                                                        $badgeClass = 'bg-success text-white';
+                                                    } elseif (str_contains(strtolower($shiftName), 'malam')) {
+                                                        $badgeClass = 'bg-purple text-white'; 
+                                                    } elseif ($shiftName != '-') {
+                                                        $badgeClass = 'bg-danger text-white';
+                                                    }
+                                                @endphp
+                                                <span class="badge {{ $badgeClass }} px-2 py-1 fw-medium">
+                                                    {{ $shiftName }}
+                                                </span>
+                                            </td>
+
+                                            <td>
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 fw-medium">
+                                                    {{ $attendance->actual_check_in ? date('H:i', strtotime($attendance->actual_check_in)) : '--:--' }}
+                                                </span>
+                                            </td>
+
+                                            <td>
+                                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1 fw-medium">
+                                                    {{ $attendance->actual_check_out ? date('H:i', strtotime($attendance->actual_check_out)) : '--:--' }}
+                                                </span>
+                                            </td>
+
+                                            <td>
+                                                <span class="{{ $attendance->late_minutes > 0 ? 'text-danger fw-semibold' : 'text-muted' }}">
+                                                    {{ $attendance->late_minutes ?? 0 }} mnt
+                                                </span>
+                                            </td>
+
+                                            <td>
+                                                <span class="{{ $attendance->early_leave_minutes > 0 ? 'text-warning fw-semibold' : 'text-muted' }}">
+                                                    {{ $attendance->early_leave_minutes ?? 0 }} mnt
+                                                </span>
+                                            </td>
+
+                                            <td>
+                                                <div class="d-flex flex-column">
+                                                    <span class="fw-medium text-dark">
+                                                        @if($attendance->work_minutes)
+                                                            {{ floor($attendance->work_minutes / 60) }} Jam 
+                                                            {{ $attendance->work_minutes % 60 }} Menit
+                                                        @else
+                                                            -
+                                                        @endif
+                                                    </span>
+                                                </div>
+                                            </td>
+
+                                            <td>
+                                                @php
+                                                    $statusStyles = [
+                                                        'present' => 'bg-success-subtle text-success border border-success-subtle',
+                                                        'alpha' => 'bg-danger-subtle text-danger border border-danger-subtle',
+                                                        'leave' => 'bg-warning-subtle text-warning border border-warning-subtle',
+                                                        'holiday' => 'bg-info-subtle text-info border border-info-subtle',
+                                                        'off' => 'bg-light text-secondary border',
+                                                    ];
+                                                    $currentStatus = strtolower($attendance->status);
+                                                    $class = $statusStyles[$currentStatus] ?? 'bg-light text-dark';
+                                                @endphp
+                                                <span class="badge {{ $class }} px-2 py-1 fw-semibold">
+                                                    {{ strtoupper($attendance->status) }}
+                                                </span>
+                                            </td>
+
+                                            <td class="pe-4 text-center">
+                                                @switch($attendance->source)
+                                                    @case('import_excel')
+                                                        <iconify-icon icon="solar:file-download-bold-duotone" class="text-success fs-22" data-bs-toggle="tooltip" title="Import Excel"></iconify-icon>
+                                                    @break
+                                                    @case('manual')
+                                                        <iconify-icon icon="solar:pen-bold-duotone" class="text-warning fs-22" data-bs-toggle="tooltip" title="Input Manual"></iconify-icon>
+                                                    @break
+                                                    @case('generated')
+                                                        <iconify-icon icon="solar:cpu-bolt-bold-duotone" class="text-primary fs-22" data-bs-toggle="tooltip" title="Generated System"></iconify-icon>
+                                                    @break
+                                                    @default
+                                                        <iconify-icon icon="solar:question-circle-bold-duotone" class="text-muted fs-22" data-bs-toggle="tooltip" title="Unknown"></iconify-icon>
+                                                @endswitch
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="9" class="text-center py-5 text-muted">
+                                                <iconify-icon icon="solar:document-text-bold-duotone" class="fs-40 mb-2 d-block text-secondary opacity-50"></iconify-icon>
+                                                Belum ada riwayat absensi pada periode ini.
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {{-- FOOTER PAGINATION --}}
+                    @if($attendances->hasPages())
+                    <div class="card-footer bg-white border-top">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-muted small">
+                                Menampilkan {{ $attendances->firstItem() }} - {{ $attendances->lastItem() }} dari {{ $attendances->total() }} data
+                            </span>
+                            {{ $attendances->withQueryString()->links() }}
+                        </div>
+                    </div>
+                    @endif
+                </div>
+
                 {{-- 🌟 FITUR BARU: Tabel Jadwal Kerja Saya (Statis & Read-Only) 🌟 --}}
                 <div class="card border-0 shadow-sm mb-4">
                     <div class="card-header bg-white py-3 border-bottom">

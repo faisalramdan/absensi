@@ -8,10 +8,10 @@ use App\Models\LeaveAllocation;
 use App\Models\Attendance;
 use App\Models\User;
 use App\Models\LoginActivity;
-use App\Models\ShiftAssignment; // 🌟 Pastikan Model ini di-import
-use App\Models\Holiday;         // 🌟 Pastikan Model ini di-import
-use Carbon\Carbon;              // 🌟 Pastikan Carbon di-import
-use Carbon\CarbonPeriod;        // 🌟 Pastikan CarbonPeriod di-import
+use App\Models\ShiftAssignment;
+use App\Models\Holiday;
+use Carbon\Carbon;
+use Carbon\CarbonPeriod;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
@@ -21,19 +21,11 @@ class DashboardController extends Controller
         $user = auth()->user();
 
         if ($user->can('dashboard.admin')) {
-
-            return redirect()->route(
-                'dashboard.admin'
-            );
-
+            return redirect()->route('dashboard.admin');
         }
 
         if ($user->can('dashboard.employee')) {
-
-            return redirect()->route(
-                'dashboard.employee'
-            );
-
+            return redirect()->route('dashboard.employee');
         }
 
         abort(403);
@@ -71,13 +63,11 @@ class DashboardController extends Controller
         |--------------------------------------------------------------------------
         | Ambil Data Karyawan & Absensi TERLEBIH DAHULU (Sebelum Variabel Digeser Period)
         |--------------------------------------------------------------------------
-        | Kita gunakan format tanggal murni 'Y-m-d' tanpa jam agar cocok dengan tipe date/datetime.
         */
         $myAttendances = Attendance::with(['leaveType'])
             ->where('employee_id', $employee->id)
             ->whereBetween('date', [$startDateInput, $endDateInput])
             ->get();
-
 
         /*
         |--------------------------------------------------------------------------
@@ -134,10 +124,10 @@ class DashboardController extends Controller
         $rejectedLeaves = $employee->leaveRequests()->where('status', 'rejected')->count();
 
         /*
-    |--------------------------------------------------------------------------
-    | KALKULASI METRIK (DIOPTIMALKAN UNTUK MENANGKAP STATUS LEAVE & HOLIDAY)
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | KALKULASI METRIK (DIOPTIMALKAN UNTUK MENANGKAP STATUS LEAVE & HOLIDAY)
+        |--------------------------------------------------------------------------
+        */
         $totalLateMinutes = $myAttendances->filter(function ($item) {
             return (int) $item->late_minutes > 0 && !$item->is_idt;
         })->sum('late_minutes');
@@ -153,8 +143,6 @@ class DashboardController extends Controller
         $period = \Carbon\CarbonPeriod::create($startDateInput, $endDateInput);
         $sundayCount = 0;
         foreach ($period as $date) {
-            // Jika sistem Anda 5 hari kerja, gunakan: $date->isWeekend()
-            // Jika sistem Anda 6 hari kerja (hanya Minggu yang off), gunakan: $date->isSunday()
             if ($date->isSunday()) {
                 $sundayCount++;
             }
@@ -172,13 +160,11 @@ class DashboardController extends Controller
             'sakit' => $myAttendances->filter(fn($i) => in_array(strtolower($i->status), ['sick', 'sakit']))->count(),
             'alpha' => $myAttendances->filter(fn($i) => strtolower($i->status) === 'alpha')->count(),
 
-            // Menghitung Cuti jika status 'leave' dan tag tipe cutinya telak berisi 'cuti'
             'cuti' => $myAttendances->filter(function ($item) {
                 return strtolower($item->status) === 'leave'
                     && strtolower(optional($item->leaveType)->tag) === 'cuti';
             })->count(),
 
-            // Menghitung Izin jika status 'leave' dan tag-nya 'izin' ATAU jika detail leaveType-nya kosong/tidak kecolongan
             'ijin' => $myAttendances->filter(function ($item) {
                 if (strtolower($item->status) !== 'leave') {
                     return false;
@@ -187,12 +173,10 @@ class DashboardController extends Controller
                 $tag = strtolower(optional($item->leaveType)->tag);
                 $code = strtoupper(optional($item->leaveType)->code);
 
-                // Jika tag-nya jelas 'izin', masukkan ke sini (kecuali kode khusus IDT/IPC/SKT)
                 if ($tag === 'izin' && !in_array($code, ['I-IDT', 'I-IPC', 'I-SKT'])) {
                     return true;
                 }
 
-                // Fallback: Jika di DB tipenya tidak terelasi (null) atau bukan 'cuti', kumpulkan ke 'ijin' agar tidak hilang menjadi 0
                 if (empty($tag) || $tag !== 'cuti') {
                     return true;
                 }
@@ -205,7 +189,6 @@ class DashboardController extends Controller
             'idt' => $myAttendances->where('is_idt', true)->count(),
             'ipc' => $myAttendances->where('is_ipc', true)->count(),
 
-            // Mengamankan hitungan holiday dari array Anda
             'holiday' => $myAttendances->filter(fn($i) => strtolower($i->status) === 'holiday')->count(),
             'off' => $myAttendances->filter(fn($i) => strtolower($i->status) === 'off')->count(),
 
@@ -240,11 +223,22 @@ class DashboardController extends Controller
                     && !$item->is_ipc;
             })->sum('short_work_minutes'),
         ];
-        // Selipkan baris ini sebelum return view
+
         $summary = $cards;
-        // Tambahkan pengaman pencocokan nama untuk forgot check log
         $summary['forgot_check_in'] = $cards['forgot_in'];
         $summary['forgot_check_out'] = $cards['forgot_out'];
+
+        /*
+        |--------------------------------------------------------------------------
+        | [TAMBAHAN BARU]: Query Absensi untuk Tabel Log (Dengan Pagination)
+        |--------------------------------------------------------------------------
+        */
+        $attendances = Attendance::with(['shift', 'leaveType'])
+            ->where('employee_id', $employee->id)
+            ->whereBetween('date', [$startDateInput, $endDateInput])
+            ->orderBy('date', 'desc') // Urutkan dari tanggal terbaru
+            ->paginate(10);           // Tampilkan 10 baris per halaman
+
         return view('dashboard.employee', compact(
             'employee',
             'activeContract',
@@ -261,7 +255,8 @@ class DashboardController extends Controller
             'workingDays',
             'calendarDays',
             'sundayCount',
-            'holidayCount'
+            'holidayCount',
+            'attendances' // <--- Jangan lupa masukkan variabel baru ini
         ))->with([
                     'startDate' => $startDateInput,
                     'endDate' => $endDateInput
@@ -273,19 +268,19 @@ class DashboardController extends Controller
         $totalUsers = User::count();
         $totalEmployees = Employee::count();
 
-        // 1. Ambil Karyawan Terbaru (Kembali ke kode asli Anda)
+        // 1. Ambil Karyawan Terbaru
         $latestEmployees = Employee::with('position')
             ->orderByDesc('join_date')
             ->take(5)
             ->get();
 
-        // 2. TAMBAHKAN: Ambil 5 Kontrak Karyawan Terbaru di Sistem
+        // 2. Ambil 5 Kontrak Karyawan Terbaru di Sistem
         $latestContracts = \App\Models\EmployeeContract::with(['employee', 'employeeStatus'])
-            ->latest() // Mengurutkan berdasarkan yang terbaru diinput/diperbarui
+            ->latest()
             ->take(5)
             ->get();
 
-        // Mengambil 5 data aktivitas terbaru (login, logout, failed_login)
+        // Mengambil 5 data aktivitas terbaru
         $latestLogins = LoginActivity::latest('logged_at')
             ->take(5)
             ->get();
@@ -296,13 +291,11 @@ class DashboardController extends Controller
                 'totalUsers',
                 'totalEmployees',
                 'latestEmployees',
-                'latestContracts', // <--- Kirim variabel baru ini ke view
+                'latestContracts',
                 'latestLogins'
             )
         );
     }
-
-    // Paste ini di dalam class DashboardController (di bagian paling bawah sebelum penutup '}')
 
     public function getScheduleEvents(\Illuminate\Http\Request $request)
     {
@@ -348,7 +341,7 @@ class DashboardController extends Controller
             $calendarEvents[] = [
                 'title' => $shiftName,
                 'start' => $formattedDate,
-                'className' => [$className, 'p-1', 'fw-semibold', 'border-0'] // Menggunakan array class bawaan template
+                'className' => [$className, 'p-1', 'fw-semibold', 'border-0']
             ];
         }
 
