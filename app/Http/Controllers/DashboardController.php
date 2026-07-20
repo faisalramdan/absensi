@@ -8,6 +8,7 @@ use App\Models\LeaveAllocation;
 use App\Models\Attendance;
 use App\Models\User;
 use App\Models\LoginActivity;
+use App\Models\LeaveRequest; // Pastikan model ini diimport
 use App\Models\ShiftAssignment;
 use App\Models\Holiday;
 use Carbon\Carbon;
@@ -265,25 +266,100 @@ class DashboardController extends Controller
 
     public function adminDashboard()
     {
+        $today = Carbon::today();
+
+        // 1. Data Dasar
         $totalUsers = User::count();
         $totalEmployees = Employee::count();
 
-        // 1. Ambil Karyawan Terbaru
+        // 2. Data Absensi Hari Ini
+        $hadirHariIni = Attendance::whereDate('date', $today)
+            ->whereIn('status', ['present', 'wfa'])
+            ->count();
+
+        $izinCutiHariIni = Attendance::whereDate('date', $today)
+            ->whereIn('status', ['sick', 'leave'])
+            ->count();
+
+        // 3. Statistik Grafik (6 Bulan Terakhir dengan Attendance Rate)
+        $kpiData = [
+            'physical' => [],
+            'authorized' => [],
+            'unauthorized' => [],
+        ];
+        $months = [];
+
+        // Ambil tahun berjalan saat ini (misal: 2026)
+        $currentYear = Carbon::now()->year;
+
+        // Loop tetap dari bulan 1 (Januari) sampai 12 (Desember)
+        for ($m = 1; $m <= 12; $m++) {
+            // Tanggal akhir periode: Tanggal 25 di bulan berjalan ($m)
+            $end = Carbon::create($currentYear, $m, 25)->endOfDay();
+
+            // Tanggal awal periode: Tanggal 26 di bulan sebelumnya
+            // Jika $m adalah 1 (Januari 2026), otomatis start menjadi 26 Desember 2025
+            $start = (clone $end)->subMonth()->day(26)->startOfDay();
+
+            $query = Attendance::whereBetween('date', [$start, $end]);
+
+            // Total Hari Kerja efektif (Bukan hari Libur/Off)
+            $totalJadwal = (clone $query)->whereNotIn('status', ['holiday', 'off'])->count();
+
+            if ($totalJadwal > 0) {
+                $hadir = (clone $query)->whereIn('status', ['present'])->count();
+                $absensiSah = (clone $query)->whereIn('status', ['sick', 'leave'])->count();
+                $alpha = (clone $query)->where('status', 'alpha')->count();
+
+                $kpiData['physical'][] = round(($hadir / $totalJadwal) * 100, 2);
+                $kpiData['authorized'][] = round(($absensiSah / $totalJadwal) * 100, 2);
+                $kpiData['unauthorized'][] = round(($alpha / $totalJadwal) * 100, 2);
+            } else {
+                // Jika bulan tersebut belum memiliki data (misal bulan depan/Agustus - Desember)
+                $kpiData['physical'][] = 0;
+                $kpiData['authorized'][] = 0;
+                $kpiData['unauthorized'][] = 0;
+            }
+
+            // Format label tetap manis menuruti urutan Januari - Desember
+            $months[] = $end->format('M Y');
+        }
+
+        // 4. Data Karyawan Terbaru
         $latestEmployees = Employee::with('position')
             ->orderByDesc('join_date')
             ->take(5)
             ->get();
 
-        // 2. Ambil 5 Kontrak Karyawan Terbaru di Sistem
+        // 5. Data Kontrak Terbaru
         $latestContracts = \App\Models\EmployeeContract::with(['employee', 'employeeStatus'])
             ->latest()
             ->take(5)
             ->get();
 
-        // Mengambil 5 data aktivitas terbaru
+        // 6. Data Log Aktivitas
         $latestLogins = LoginActivity::latest('logged_at')
             ->take(5)
             ->get();
+
+        // ==========================================
+        // 7. Data Cuti Bulan Ini (Approved)
+        // ==========================================
+        // Catatan: Pastikan nama modelnya adalah 'LeaveRequest' (sesuaikan jika berbeda).
+        // Saya menambahkan \App\Models\ di depannya agar tidak terjadi error "Class not found".
+        // 7. Data Cuti Bulan Ini (Approved)
+        $approvedLeaves = \App\Models\LeaveRequest::with(['employee', 'leaveType']) // <-- Pastikan 'leaveType' dipanggil di sini
+            ->where('status', 'approved')
+            ->whereMonth('start_date', $today->month)
+            ->whereYear('start_date', $today->year)
+            ->orderBy('start_date', 'asc')
+            ->get();
+
+        // 8. Data Ulang Tahun Bulan Ini
+        $upcomingBirthdays = \App\Models\Employee::whereMonth('birth_date', Carbon::now()->month)
+            ->orderByRaw('DAY(birth_date) asc') // Mengurutkan berdasarkan tanggal terkecil ke terbesar
+            ->get();
+
 
         return view(
             'dashboard.admin',
@@ -292,7 +368,13 @@ class DashboardController extends Controller
                 'totalEmployees',
                 'latestEmployees',
                 'latestContracts',
-                'latestLogins'
+                'latestLogins',
+                'hadirHariIni',
+                'izinCutiHariIni',
+                'kpiData',
+                'months',
+                'approvedLeaves', // <-- Tambahan variabel untuk dikirim ke file Blade
+                'upcomingBirthdays' // <-- Tambahan variabel untuk dikirim ke file Blade
             )
         );
     }
