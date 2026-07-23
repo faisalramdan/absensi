@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use App\Models\Employee;
-use App\Models\company;
+use App\Models\Company;
 use App\Models\Attendance;
 use App\Models\Holiday;
 
