@@ -157,24 +157,52 @@
 
                                                     <td>
                                                         @if($employee->photo)
-                                                            <img src="{{ asset('storage/' . $employee->photo) }}" width="50"
-                                                                height="50" class="rounded-circle object-fit-cover"
-                                                                alt="{{ $employee->full_name }}">
+                                                            <div style="cursor: pointer;" data-bs-toggle="modal"
+                                                                data-bs-target="#employeePhotoModal{{ $employee->id }}">
+                                                                <img src="{{ asset('storage/' . $employee->photo) }}" width="50"
+                                                                    height="50" class="rounded-circle object-fit-cover shadow-sm"
+                                                                    alt="{{ $employee->full_name }}"
+                                                                    style="transition: transform 0.2s;"
+                                                                    onmouseover="this.style.transform='scale(1.1)'"
+                                                                    onmouseout="this.style.transform='scale(1)'">
+                                                            </div>
+
+                                                            <div class="modal fade" id="employeePhotoModal{{ $employee->id }}"
+                                                                tabindex="-1" aria-hidden="true">
+                                                                <div class="modal-dialog modal-dialog-centered">
+                                                                    <div class="modal-content bg-transparent border-0 shadow-none">
+                                                                        <div class="modal-header border-0 justify-content-end pb-0">
+                                                                            <button type="button"
+                                                                                class="btn-close bg-light rounded-circle p-2"
+                                                                                data-bs-dismiss="modal" aria-label="Close"></button>
+                                                                        </div>
+                                                                        <div class="modal-body text-center">
+                                                                            <img src="{{ asset('storage/' . $employee->photo) }}"
+                                                                                alt="Foto {{ $employee->full_name }}"
+                                                                                class="img-fluid rounded shadow-lg"
+                                                                                style="max-height: 70vh; object-fit: contain;">
+                                                                            <h5 class="text-white fw-bold mt-3">
+                                                                                {{ $employee->full_name }}</h5>
+                                                                            <span
+                                                                                class="badge bg-light text-dark">{{ $employee->position?->name ?? 'Karyawan' }}
+                                                                                - {{ $employee->nik }}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
                                                         @else
                                                             @php
                                                                 $nameParts = explode(' ', trim($employee->full_name));
                                                                 $initials = '';
-
                                                                 foreach ($nameParts as $part) {
                                                                     if (!empty($part)) {
                                                                         $initials .= strtoupper(substr($part, 0, 1));
                                                                     }
                                                                 }
-
                                                                 $initials = substr($initials, 0, 2);
                                                             @endphp
 
-                                                            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center"
+                                                            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center shadow-sm"
                                                                 style="width:50px;height:50px;font-size:18px;font-weight:600;">
                                                                 {{ $initials }}
                                                             </div>
