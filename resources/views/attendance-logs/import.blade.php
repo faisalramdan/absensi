@@ -14,64 +14,73 @@
                         <h5 class="mb-0 fw-semibold text-dark">Panduan Penting Sebelum Import Data</h5>
                     </div>
                     <div class="card-body">
-                        <p class="text-muted mb-4 fs-14">
-                            Untuk menghindari kegagalan sistem, mohon pastikan file Excel Anda telah disiapkan mengikuti
-                            langkah-langkah standarisasi format di bawah ini:
-                        </p>
+                        <div class="alert alert-primary py-2 px-3 mb-4 rounded-3 d-flex align-items-start">
+                            <iconify-icon icon="solar:bell-bing-bold-duotone"
+                                class="fs-20 me-2 mt-1 text-primary"></iconify-icon>
+                            <span class="fs-14"><strong>Gunakan Format Template Mandiri:</strong> Pastikan Anda menggunakan
+                                file template Excel absensi mandiri yang sudah disediakan. Harap perhatikan hal-hal krusial
+                                di bawah ini sebelum melakukan proses import.</span>
+                        </div>
 
                         {{-- Timeline Langkah-Langkah --}}
                         <div class="position-relative ps-3">
                             <div class="position-absolute start-0 top-0 bottom-0 border-start border-2 border-primary-subtle"
                                 style="left: 7px !important;"></div>
 
+                            {{-- LANGKAH 1: NIK KARYAWAN --}}
                             <div class="position-relative mb-4">
-                                <div class="position-absolute start-0 bg-primary text-white rounded-circle d-flex align-items-center justify-content-center"
+                                <div class="position-absolute start-0 bg-danger text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm"
                                     style="width: 24px; height: 24px; left: -24px !important; top: 0px; z-index: 2;">
                                     <small class="fw-bold">1</small>
                                 </div>
                                 <div class="ms-3">
-                                    <h6 class="fw-semibold mb-1">Unduh File dari Mesin Fingerprint</h6>
-                                    <p class="text-muted small mb-0">Pastikan Anda telah mengekspor data absensi dari mesin
-                                        fingerprint (biasanya berformat bawaan <span
-                                            class="badge bg-light text-dark border">.xls</span>).</p>
+                                    <h6 class="fw-semibold mb-1 text-danger">Kesesuaian NIK Karyawan (Sangat Penting!)</h6>
+                                    <p class="text-muted small mb-1">Data absensi dicocokkan berdasarkan Nomor Induk
+                                        Karyawan.</p>
+                                    <div
+                                        class="alert alert-danger py-2 px-3 mb-0 d-inline-block rounded-3 fs-13 border-danger-subtle">
+                                        <iconify-icon icon="solar:danger-triangle-bold"
+                                            class="me-1 text-danger"></iconify-icon>
+                                        Pastikan <strong>NIK</strong> dari setiap karyawan di file Excel <strong>sama
+                                            persis</strong> dengan NIK yang terdaftar di dalam sistem HRIS. Jika NIK
+                                        salah/berbeda, data absen karyawan tersebut tidak akan masuk!
+                                    </div>
                                 </div>
                             </div>
 
+                            {{-- LANGKAH 2: FORMAT PERIODE --}}
                             <div class="position-relative mb-4">
                                 <div class="position-absolute start-0 bg-primary text-white rounded-circle d-flex align-items-center justify-content-center"
                                     style="width: 24px; height: 24px; left: -24px !important; top: 0px; z-index: 2;">
                                     <small class="fw-bold">2</small>
                                 </div>
                                 <div class="ms-3">
-                                    <h6 class="fw-semibold mb-1">Ubah Format File (Save As)</h6>
-                                    <p class="text-muted small mb-0">Buka file tersebut di Microsoft Excel, lalu lakukan
-                                        <strong>Save As</strong> dan ubah formatnya menjadi <span
-                                            class="badge bg-success-subtle text-success border border-success-subtle">.xlsx</span>
-                                        (Excel Workbook).
+                                    <h6 class="fw-semibold mb-1">Perhatikan Format Penulisan Periode</h6>
+                                    <p class="text-muted small mb-0">
+                                        Periksa kembali format tanggal pada baris periode (contoh:
+                                        <code>Periode: 26 Juni 2026 s/d 25 Juli 2026</code>). Pastikan ejaan dan penulisan
+                                        tahunnya benar agar sistem dapat mendeteksi bulan absensi dengan tepat.
                                     </p>
                                 </div>
                             </div>
 
+                            {{-- LANGKAH 3: STRUKTUR HEADER --}}
                             <div class="position-relative mb-4">
                                 <div class="position-absolute start-0 bg-primary text-white rounded-circle d-flex align-items-center justify-content-center"
                                     style="width: 24px; height: 24px; left: -24px !important; top: 0px; z-index: 2;">
                                     <small class="fw-bold">3</small>
                                 </div>
                                 <div class="ms-3">
-                                    <h6 class="fw-semibold mb-1">Pindahkan Sheet "Catatan" ke Urutan Pertama</h6>
-                                    <p class="text-muted small mb-1">Sistem ini dikonfigurasi secara ketat untuk
-                                        <strong>hanya membaca sheet pertama</strong>.
+                                    <h6 class="fw-semibold mb-1">Jangan Ubah Baris Judul (Header)</h6>
+                                    <p class="text-muted small mb-0">
+                                        Biarkan <strong>Baris 1 hingga 4</strong> (Data Absensi, Nama PT, dan baris Periode)
+                                        berada di posisinya. Sistem diprogram untuk mulai membaca data absen persis di bawah
+                                        baris tersebut.
                                     </p>
-                                    <div class="alert alert-warning py-2 px-3 mb-0 d-inline-block rounded-3 fs-13">
-                                        <iconify-icon icon="solar:danger-triangle-bold"
-                                            class="me-1 text-warning"></iconify-icon>
-                                        Buka file Anda, cari sheet bernama <strong>"Catatan"</strong>, lalu geser/pindahkan
-                                        sheet tersebut ke <strong>posisi paling kiri (urutan pertama)</strong>, kemudian
-                                        simpan kembali (Save).
-                                    </div>
                                 </div>
                             </div>
 
+                            {{-- SIAP IMPORT --}}
                             <div class="position-relative">
                                 <div class="position-absolute start-0 bg-success text-white rounded-circle d-flex align-items-center justify-content-center"
                                     style="width: 24px; height: 24px; left: -24px !important; top: 0px; z-index: 2;">
@@ -79,8 +88,12 @@
                                 </div>
                                 <div class="ms-3">
                                     <h6 class="fw-semibold mb-1 text-success">Siap untuk Di-import</h6>
-                                    <p class="text-muted small mb-0">File Anda sekarang sudah memenuhi standar sistem dan
-                                        siap diunggah pada form di bawah ini.</p>
+                                    <p class="text-muted small mb-0">Jika NIK, Periode, dan struktur file sudah benar, file
+                                        Anda siap diunggah pada form di bawah ini dalam format <span
+                                            class="badge bg-success-subtle text-success border border-success-subtle">.xlsx</span>
+                                        atau <span
+                                            class="badge bg-success-subtle text-success border border-success-subtle">.csv</span>.
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -104,12 +117,12 @@
                             @csrf
 
                             <div class="mb-4">
-                                <label class="form-label fw-semibold">Pilih File Excel</label>
-                                <input type="file" name="file" class="form-control" accept=".xlsx" required>
-                                <div class="form-text">Hanya menerima format berkas .xlsx yang sudah disesuaikan.</div>
+                                <label class="form-label fw-semibold">Pilih File Absensi (Format Mandiri)</label>
+                                <input type="file" name="file" class="form-control" accept=".xlsx,.csv" required>
+                                <div class="form-text">Menerima berkas berekstensi .xlsx atau .csv.</div>
                             </div>
 
-                            {{-- INFORMASI OVERWRITE / UPDATE DATA (YANG BARU DITAMBAHKAN) --}}
+                            {{-- INFORMASI OVERWRITE / UPDATE DATA --}}
                             <div class="alert alert-info border-0 shadow-sm d-flex align-items-start gap-2 mb-4 rounded-3">
                                 <iconify-icon icon="solar:info-circle-bold text-info" class="fs-20 mt-1"></iconify-icon>
                                 <div>

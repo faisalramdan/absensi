@@ -199,7 +199,9 @@
                         <div class="col-12 col-lg-6 mb-4">
                             <div class="card h-100">
                                 <div class="card-header d-flex justify-content-between align-items-center">
-                                    <h4 class="card-title mb-0">Kontrak Karyawan Terbaru</h4>
+                                    <h4 class="card-title mb-0 text-dark">
+                                        <i class="bi bi-clock-history text-warning me-2"></i>Kontrak Karyawan Segera Berakhir
+                                    </h4>
                                     <a href="{{ route('employee-contracts.index') }}" class="btn btn-sm btn-light">Lihat Semua</a>
                                 </div>
                                 <div class="card-body">
@@ -209,12 +211,18 @@
                                                 <tr>
                                                     <th>Nama Karyawan</th>
                                                     <th>No. Kontrak</th>
-                                                    <th>Masa Kontrak</th>
-                                                    <th>Status</th>
+                                                    <th>Berakhir Pada</th>
+                                                    <th>Peringatan</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                @forelse($latestContracts as $contract)
+                                                @forelse($expiringContracts as $contract)
+                                                    @php
+                                                        // Menghitung sisa hari
+                                                        $daysLeft = \Carbon\Carbon::today()->diffInDays(\Carbon\Carbon::parse($contract->end_date), false);
+                                                        // Merah jika sisa <= 7 hari, Kuning jika lebih
+                                                        $badgeColor = $daysLeft <= 7 ? 'danger' : 'warning';
+                                                    @endphp
                                                     <tr>
                                                         <td>
                                                             <span class="fw-medium text-dark">{{ $contract->employee?->full_name ?? '-' }}</span><br>
@@ -227,21 +235,20 @@
                                                             </span>
                                                         </td>
                                                         <td>
-                                                            <span class="text-dark fw-semibold">{{ \Carbon\Carbon::parse($contract->start_date)->format('d/m/y') }}</span>
-                                                            <small class="text-muted">s/d</small>
                                                             <span class="text-dark fw-semibold">{{ \Carbon\Carbon::parse($contract->end_date)->format('d/m/y') }}</span>
                                                         </td>
                                                         <td>
-                                                            @if($contract->is_active)
-                                                                <span class="badge bg-success-subtle text-success border border-success-subtle px-1.5 py-0.5 small">Aktif</span>
-                                                            @else
-                                                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-1.5 py-0.5 small">Tidak Aktif</span>
-                                                            @endif
+                                                            <span class="badge bg-{{ $badgeColor }} text-white px-2 py-1">
+                                                                Sisa {{ ceil($daysLeft) }} Hari
+                                                            </span>
                                                         </td>
                                                     </tr>
                                                 @empty
                                                     <tr>
-                                                        <td colspan="4" class="text-center text-muted py-3">Belum ada data kontrak terbaru.</td>
+                                                        <td colspan="4" class="text-center text-muted py-4">
+                                                            <i class="bi bi-shield-check fs-4 d-block mb-1 text-success"></i>
+                                                            Aman! Tidak ada kontrak yang akan berakhir dalam 30 hari ke depan.
+                                                        </td>
                                                     </tr>
                                                 @endforelse
                                             </tbody>
@@ -268,21 +275,62 @@
                                     @if(isset($upcomingBirthdays) && $upcomingBirthdays->count() > 0)
                                         <ul class="list-group list-group-flush">
                                             @foreach($upcomingBirthdays as $employee)
+                                                @php
+                                                    // Menghitung umur / ulang tahun ke-berapa saat ini
+                                                    $age = \Carbon\Carbon::parse($employee->birth_date)->age;
+                                                @endphp
                                                 <li class="list-group-item px-0 d-flex justify-content-between align-items-center {{ !$loop->last ? 'border-bottom border-dashed' : '' }}">
                                                     <div class="d-flex align-items-center">
-                                                        <div class="avatar-sm bg-purple-subtle rounded-circle d-flex align-items-center justify-content-center me-3"
-                                                            style="width: 38px; height: 38px;">
-                                                            <iconify-icon icon="solar:user-rounded-bold-duotone" class="text-primary fs-20"></iconify-icon>
+                                                        
+                                                        <div class="me-3">
+                                                            @if($employee->photo)
+                                                                <div style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#photoModal{{ $employee->id }}">
+                                                                    <img src="{{ asset('storage/' . $employee->photo) }}" 
+                                                                        alt="Foto {{ $employee->full_name }}" 
+                                                                        class="rounded-circle object-fit-cover shadow-sm" 
+                                                                        style="width: 40px; height: 40px; transition: transform 0.2s;"
+                                                                        onmouseover="this.style.transform='scale(1.1)'"
+                                                                        onmouseout="this.style.transform='scale(1)'">
+                                                                </div>
+
+                                                                <div class="modal fade" id="photoModal{{ $employee->id }}" tabindex="-1" aria-hidden="true">
+                                                                    <div class="modal-dialog modal-dialog-centered">
+                                                                        <div class="modal-content bg-transparent border-0 shadow-none">
+                                                                            <div class="modal-header border-0 justify-content-end pb-0">
+                                                                                <button type="button" class="btn-close bg-light rounded-circle p-2" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                                            </div>
+                                                                            <div class="modal-body text-center">
+                                                                                <img src="{{ asset('storage/' . $employee->photo) }}" 
+                                                                                    alt="Foto {{ $employee->full_name }}" 
+                                                                                    class="img-fluid rounded shadow-lg" 
+                                                                                    style="max-height: 70vh; object-fit: contain;">
+                                                                                <h5 class="text-white fw-bold mt-3">{{ $employee->full_name }} ({{ $age }} Tahun)</h5>
+                                                                                <span class="badge bg-light text-dark">{{ $employee->position?->name ?? 'Karyawan' }}</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            @else
+                                                                <div class="avatar-sm bg-purple-subtle rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                                                    <iconify-icon icon="solar:user-rounded-bold-duotone" class="text-primary fs-20"></iconify-icon>
+                                                                </div>
+                                                            @endif
                                                         </div>
+
                                                         <div>
-                                                            <h6 class="mb-0 fw-semibold text-dark">{{ $employee->full_name }}</h6>
+                                                            <h6 class="mb-0 fw-semibold text-dark">
+                                                                {{ $employee->full_name }}
+                                                                <small class="text-purple fw-bold ms-1" style="font-size: 11px;">({{ $age }} th)</small>
+                                                            </h6>
                                                             <small class="text-muted">{{ $employee->position?->name ?? 'Karyawan' }}</small>
                                                         </div>
                                                     </div>
+                                                    
                                                     <div class="text-end">
-                                                        <span class="badge bg-purple text-white fw-bold px-2 py-1 fs-12 rounded">
+                                                        <span class="badge bg-purple text-white fw-bold px-2 py-1 fs-12 rounded mb-1 d-block">
                                                             {{ \Carbon\Carbon::parse($employee->birth_date)->format('d M') }}
                                                         </span>
+                                                        
                                                     </div>
                                                 </li>
                                             @endforeach

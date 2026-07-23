@@ -332,8 +332,10 @@ class DashboardController extends Controller
             ->get();
 
         // 5. Data Kontrak Terbaru
-        $latestContracts = \App\Models\EmployeeContract::with(['employee', 'employeeStatus'])
-            ->latest()
+        $expiringContracts = \App\Models\EmployeeContract::with(['employee', 'employeeStatus'])
+            ->where('end_date', '>=', Carbon::today()) // Hanya yang belum kedaluwarsa
+            ->where('end_date', '<=', Carbon::today()->addDays(30)) // Berakhir dalam 30 hari ke depan
+            ->orderBy('end_date', 'asc') // Urutkan dari yang paling mepet waktunya
             ->take(5)
             ->get();
 
@@ -367,7 +369,7 @@ class DashboardController extends Controller
                 'totalUsers',
                 'totalEmployees',
                 'latestEmployees',
-                'latestContracts',
+                'expiringContracts',
                 'latestLogins',
                 'hadirHariIni',
                 'izinCutiHariIni',
