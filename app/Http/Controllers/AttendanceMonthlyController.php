@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use App\Models\Employee;
+use App\Models\company;
 use App\Models\Attendance;
 use App\Models\Holiday;
 
@@ -12,6 +13,8 @@ class AttendanceMonthlyController extends Controller
 {
     public function index(Request $request)
     {
+        $companies = Company::all();
+
         // Mengambil semua karyawan aktif untuk dropdown filter di view
         $employees = Employee::where('is_active', true)
             ->orderBy('full_name')
@@ -58,6 +61,14 @@ class AttendanceMonthlyController extends Controller
             ->whereBetween('attendances.date', [$startDate, $endDate])
             ->orderBy('employees.full_name', 'asc')
             ->select('attendances.*');
+
+        // 🔍 FILTER BARU: Berdasarkan Perusahaan (Company)
+        if ($request->filled('company_id')) {
+            $companyId = $request->company_id;
+            $query->whereHas('employee', function ($q) use ($companyId) {
+                $q->where('company_id', $companyId);
+            });
+        }
 
         // Filter opsional jika user menyaring per individu karyawan
         if ($request->filled('employee_id')) {
@@ -260,6 +271,7 @@ class AttendanceMonthlyController extends Controller
         return view('attendance-monthly.index', compact(
             'summary',
             'cards',
+            'companies',
             'employees',
             'selectedYear',
             'selectedMonth',
@@ -309,6 +321,11 @@ class AttendanceMonthlyController extends Controller
             'late_minutes' => $attendances->filter(function ($row) {
                 return $row->is_idt != true;
             })->sum('late_minutes'),
+
+            // 🔥 TAMBAHKAN KUNCI 'late' DI SINI (Menghitung frekuensi keterlambatan murni)
+            'late' => $attendances->filter(function ($row) {
+                return $row->late_minutes > 0 && $row->is_idt != true;
+            })->count(),
             'early_leave_minutes' => $attendances->filter(function ($row) {
                 return $row->is_ipc != true;
             })->sum('early_leave_minutes'),

@@ -7,11 +7,14 @@ use App\Models\Employee;
 use App\Models\Attendance;
 use Illuminate\Http\Request;
 use App\Models\Holiday;
+use App\Models\Company;
 
 class AttendanceController extends Controller
 {
     public function index(Request $request)
     {
+
+        $companies = Company::all();
 
         // Mengambil daftar karyawan yang aktif untuk filter dropdown pada view
         $employees = Employee::where('is_active', true)
@@ -72,6 +75,16 @@ class AttendanceController extends Controller
             $startDate,
             $endDate
         ]);
+
+        // Kondisi opsional: Filter berdasarkan Company (Perusahaan)
+        if ($request->filled('company_id')) {
+            $companyId = $request->company_id;
+
+            // Menyaring absensi berdasarkan karyawan yang memiliki company_id tersebut
+            $query->whereHas('employee', function ($q) use ($companyId) {
+                $q->where('company_id', $companyId);
+            });
+        }
 
         // Kondisi opsional: Filter berdasarkan karyawan tertentu jika dipilih
         if ($request->filled('employee_id')) {
@@ -294,6 +307,7 @@ class AttendanceController extends Controller
             'attendances.index',
             compact(
                 'attendances',
+                'companies',
                 'employees',
                 'selectedYear',
                 'selectedMonth',

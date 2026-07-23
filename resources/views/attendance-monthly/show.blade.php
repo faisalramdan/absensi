@@ -156,11 +156,11 @@
                                                 $shiftName = $attendance->shift?->name ?? '-';
                                                 $badgeClass = 'bg-light text-muted';
 
-                                                if (str_contains(strtolower($shiftName), '1')) {
+                                                if (str_contains(strtolower($shiftName), 'pagi')) {
                                                     $badgeClass = 'bg-primary text-white';
-                                                } elseif (str_contains(strtolower($shiftName), '2')) {
+                                                } elseif (str_contains(strtolower($shiftName), 'siang')) {
                                                     $badgeClass = 'bg-success text-white';
-                                                } elseif (str_contains(strtolower($shiftName), '3')) {
+                                                } elseif (str_contains(strtolower($shiftName), 'malam')) {
                                                     $badgeClass = 'bg-purple text-white'; 
                                                 } elseif ($shiftName != '-') {
                                                     $badgeClass = 'bg-danger text-white';

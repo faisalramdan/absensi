@@ -36,9 +36,11 @@
                         <form method="GET" id="filterForm">
                             <div class="row align-items-end g-3">
 
-                                {{-- 1. Filter Tahun --}}
-                                <div class="col-md-2">
-                                    <label class="form-label fw-semibold">Tahun Periode</label>
+                                {{-- BARIS 1: Periode & Tanggal (Total: 12 Kolom) --}}
+                                
+                                {{-- 1. Filter Tahun (col-md-2) --}}
+                                <div class="col-md-3">
+                                    <label class="form-label fw-semibold">Tahun</label>
                                     <select name="year" id="filterYear" class="form-select">
                                         @for($y = date('Y'); $y >= date('Y') - 3; $y--)
                                             <option value="{{ $y }}" @selected($selectedYear == $y)>{{ $y }}</option>
@@ -46,48 +48,63 @@
                                     </select>
                                 </div>
 
-                                {{-- 2. Filter Bulan --}}
-                                <div class="col-md-2">
-                                    <label class="form-label fw-semibold">Bulan Periode</label>
+                                {{-- 2. Filter Bulan (col-md-2) --}}
+                                <div class="col-md-3">
+                                    <label class="form-label fw-semibold">Bulan</label>
                                     <select name="month" id="filterMonth" class="form-select">
-                                        @foreach([
-                                            '01' => 'Januari', '02' => 'Februari', '03' => 'Maret', 
-                                            '04' => 'April', '05' => 'Mei', '06' => 'Juni', 
-                                            '07' => 'Juli', '08' => 'Agustus', '09' => 'September', 
-                                            '10' => 'Oktober', '11' => 'November', '12' => 'Desember'
-                                        ] as $num => $name)
+                                        @foreach(['01'=>'Januari', '02'=>'Februari', '03'=>'Maret', '04'=>'April', '05'=>'Mei', '06'=>'Juni', '07'=>'Juli', '08'=>'Agustus', '09'=>'September', '10'=>'Oktober', '11'=>'November', '12'=>'Desember'] as $num => $name)
                                             <option value="{{ $num }}" @selected($selectedMonth == $num)>{{ $name }}</option>
                                         @endforeach
                                     </select>
                                 </div>
 
-                                {{-- 3. Tanggal Start (Otomatis berubah via JS) --}}
-                                <div class="col-md-2">
-                                    <label class="form-label fw-semibold text-primary">Tanggal Start</label>
-                                    <input type="date" name="start_date" id="startDate" value="{{ $startDate }}" class="form-control border-primary-subtle">
+                                {{-- 3. Tanggal Start (col-md-3) --}}
+                                <div class="col-md-3">
+                                    <label class="form-label fw-semibold">Tgl Start</label>
+                                    <input type="date" name="start_date" id="startDate" value="{{ $startDate }}" class="form-control">
                                 </div>
 
-                                {{-- 4. Tanggal End (Otomatis berubah via JS) --}}
-                                <div class="col-md-2">
-                                    <label class="form-label fw-semibold text-primary">Tanggal End</label>
-                                    <input type="date" name="end_date" id="endDate" value="{{ $endDate }}" class="form-control border-primary-subtle">
+                                {{-- 4. Tanggal End (col-md-3) --}}
+                                <div class="col-md-3">
+                                    <label class="form-label fw-semibold">Tgl End</label>
+                                    <input type="date" name="end_date" id="endDate" value="{{ $endDate }}" class="form-control">
                                 </div>
 
-                                {{-- 5. Pilih Karyawan --}}
-                                <div class="col-md-2">
-                                    <label class="form-label fw-semibold">Pilih Karyawan</label>
-                                    <select name="employee_id" class="form-select">
+                                {{-- BARIS 2: Perusahaan, Karyawan, Status, & Tombol (Total: 12 Kolom) --}}
+
+                                {{-- 5. Filter Perusahaan (col-md-3) --}}
+                                <div class="col-md-3">
+                                    <label class="form-label fw-semibold text-primary">Perusahaan</label>
+                                    <select name="company_id" id="filterCompany" class="form-select border-primary-subtle">
+                                        <option value="">-- Semua Perusahaan --</option>
+                                        @php
+                                            $defaultCompany = request('company_id', auth()->user()->employee?->company_id ?? auth()->user()->company_id ?? '');
+                                        @endphp
+                                        @foreach($companies as $company)
+                                            <option value="{{ $company->id }}" @selected($defaultCompany == $company->id)>
+                                                {{ $company->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                {{-- 6. Pilih Karyawan (col-md-3) --}}
+                                <div class="col-md-3">
+                                    <label class="form-label fw-semibold text-primary">Pilih Karyawan</label>
+                                    <select name="employee_id" id="filterEmployee" class="form-select border-primary-subtle">
                                         <option value="">-- Semua Karyawan --</option>
                                         @foreach($employees as $employee)
-                                            <option value="{{ $employee->id }}" @selected(request('employee_id') == $employee->id)>
+                                            <option value="{{ $employee->id }}" 
+                                                    data-company="{{ $employee->company_id }}" 
+                                                    @selected(request('employee_id') == $employee->id)>
                                                 [{{ $employee->nik }}] {{ $employee->full_name }}
                                             </option>
                                         @endforeach
                                     </select>
                                 </div>
 
-                                {{-- 6. Pilih Status --}}
-                                <div class="col-md-2">
+                                {{-- 7. Pilih Status (col-md-2) --}}
+                                <div class="col-md-3">
                                     <label class="form-label fw-semibold">Status</label>
                                     <select name="status" class="form-select">
                                         <option value="">-- Semua Status --</option>
@@ -99,10 +116,10 @@
                                     </select>
                                 </div>
 
-                                {{-- Tombol Aksi --}}
-                                <div class="col-12 d-flex justify-content-end gap-2 mt-3">
-                                    <a href="{{ route('attendances.index') }}" class="btn btn-secondary px-4">Reset</a>
-                                    <button type="submit" class="btn btn-primary px-4">Apply Filter</button>
+                                {{-- 8. Tombol Aksi (col-md-4) -> Sejajar di Baris ke-2 --}}
+                                <div class="col-md-2 d-flex align-items-end justify-content-end gap-2">
+                                    <a href="{{ route('attendances.index') }}" class="btn btn-secondary px-3 flex-fill">Reset</a>
+                                    <button type="submit" class="btn btn-primary px-3 flex-fill">Apply</button>
                                 </div>
 
                             </div>
@@ -474,9 +491,10 @@
     </div>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
+    
     /*
     |--------------------------------------------------------------------------
-    | Inisialisasi Bootstrap Tooltip
+    | 1. Inisialisasi Bootstrap Tooltip
     |--------------------------------------------------------------------------
     */
     document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
@@ -485,7 +503,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Logika Auto-Update Tanggal Cut-Off (26 - 25)
+    | 2. Logika Auto-Update Tanggal Cut-Off (26 - 25)
     |--------------------------------------------------------------------------
     */
     const yearSelect = document.getElementById("filterYear");
@@ -526,6 +544,51 @@ document.addEventListener("DOMContentLoaded", function () {
         yearSelect.addEventListener("change", updateCutoffDates);
         monthSelect.addEventListener("change", updateCutoffDates);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | 3. Logika Dropdown Dinamis: Filter Perusahaan -> Karyawan
+    |--------------------------------------------------------------------------
+    */
+    const companySelect = document.getElementById('filterCompany');
+    const employeeSelect = document.getElementById('filterEmployee');
+    
+    // Pastikan elemennya ada di halaman agar tidak terjadi error console
+    if (companySelect && employeeSelect) {
+        // Simpan semua opsi karyawan ke dalam array sebagai data cadangan
+        const employeeOptions = Array.from(employeeSelect.options);
+
+        function filterEmployees() {
+            const selectedCompany = companySelect.value;
+            const currentSelectedEmployee = employeeSelect.value;
+            
+            // Kosongkan opsi karyawan yang ada di dropdown saat ini
+            employeeSelect.innerHTML = '<option value="">-- Semua Karyawan --</option>';
+            
+            // Masukkan kembali opsi karyawan yang sesuai dengan perusahaan terpilih
+            employeeOptions.forEach(option => {
+                if (option.value === "") return; // Abaikan opsi default '-- Semua Karyawan --'
+                
+                // Jika tidak ada perusahaan dipilih (semua) ATAU perusahaan cocok dengan data karyawan
+                if (selectedCompany === "" || option.getAttribute('data-company') === selectedCompany) {
+                    employeeSelect.appendChild(option.cloneNode(true));
+                }
+            });
+
+            // Kembalikan status 'terpilih' jika karyawan tersebut masih valid & ada di list yang baru
+            const isValidStill = Array.from(employeeSelect.options).some(opt => opt.value === currentSelectedEmployee);
+            if (isValidStill && currentSelectedEmployee !== "") {
+                employeeSelect.value = currentSelectedEmployee;
+            }
+        }
+
+        // Jalankan filter saat halaman pertama kali dimuat (menyesuaikan default login user)
+        filterEmployees();
+
+        // Jalankan ulang filter setiap kali dropdown Perusahaan diganti
+        companySelect.addEventListener('change', filterEmployees);
+    }
+
 });
 </script>
 @endsection

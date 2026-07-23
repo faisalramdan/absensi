@@ -57,8 +57,11 @@ thead .sticky-col-2 {
                 <div class="card-body">
                     <form method="GET">
                         <div class="row align-items-end g-3">
-                            {{-- Tahun --}}
-                            <div class="col-md-2">
+
+                            {{-- BARIS 1: Periode & Tanggal (Total: 12 Kolom) --}}
+                            
+                            {{-- 1. Tahun Periode (col-md-2) --}}
+                            <div class="col-md-3">
                                 <label class="form-label fw-semibold text-secondary small">Tahun Periode</label>
                                 <select name="year" class="form-select">
                                     @for($y = date('Y'); $y >= date('Y')-3; $y--)
@@ -67,8 +70,8 @@ thead .sticky-col-2 {
                                 </select>
                             </div>
 
-                            {{-- Bulan --}}
-                            <div class="col-md-2">
+                            {{-- 2. Bulan Periode (col-md-2) --}}
+                            <div class="col-md-3">
                                 <label class="form-label fw-semibold text-secondary small">Bulan Periode</label>
                                 <select name="month" class="form-select">
                                     @foreach([
@@ -81,39 +84,58 @@ thead .sticky-col-2 {
                                 </select>
                             </div>
 
-                            {{-- Start Date --}}
-                            <div class="col-md-2">
-                                <label class="form-label fw-semibold text-primary small">Tanggal Start</label>
-                                <input type="date" name="start_date" value="{{ $startDate }}" class="form-control border-primary-subtle">
+                            {{-- 3. Tanggal Start (col-md-3) --}}
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold small">Tanggal Start</label>
+                                <input type="date" name="start_date" value="{{ $startDate }}" class="form-control ">
                             </div>
 
-                            {{-- End Date --}}
-                            <div class="col-md-2">
-                                <label class="form-label fw-semibold text-primary small">Tanggal End</label>
-                                <input type="date" name="end_date" value="{{ $endDate }}" class="form-control border-primary-subtle">
+                            {{-- 4. Tanggal End (col-md-3) --}}
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold small">Tanggal End</label>
+                                <input type="date" name="end_date" value="{{ $endDate }}" class="form-control">
                             </div>
 
-                            {{-- Employee --}}
+                            
+
+                            {{-- 5. Filter Perusahaan (col-md-4) --}}
                             <div class="col-md-4">
-                                <label class="form-label fw-semibold text-secondary small">Karyawan</label>
-                                <select name="employee_id" class="form-select">
+                                <label class="form-label fw-semibold text-primary small">Perusahaan</label>
+                                <select name="company_id" class="form-select border-primary-subtle">
+                                    <option value="">-- Semua Perusahaan --</option>
+                                    @php
+                                        $defaultCompany = request('company_id', auth()->user()->employee?->company_id ?? auth()->user()->company_id ?? '');
+                                    @endphp
+                                    @foreach($companies as $company)
+                                        <option value="{{ $company->id }}" @selected($defaultCompany == $company->id)>
+                                            {{ $company->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            {{-- 6. Pilih Karyawan (col-md-4) --}}
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold text-primary small">Karyawan</label>
+                                <select name="employee_id" class="form-select border-primary-subtle">
                                     <option value="">-- Semua Karyawan --</option>
                                     @foreach($employees as $employee)
-                                        <option value="{{ $employee->id }}" @selected(request('employee_id') == $employee->id)>
+                                        <option value="{{ $employee->id }}" data-company="{{ $employee->company_id }}" @selected(request('employee_id') == $employee->id)>
                                             [{{ $employee->nik }}] {{ $employee->full_name }}
                                         </option>
                                     @endforeach
                                 </select>
                             </div>
 
-                            {{-- Action Buttons --}}
-                            <div class="col-12 d-flex justify-content-end gap-2 mt-3">
-                                <a href="{{ route('attendance-monthly.index') }}" class="btn btn-secondary px-3">Reset</a>
-                                <button type="submit" class="btn btn-primary px-3 d-inline-flex align-items-center gap-1">
+                            {{-- 7. Tombol Aksi (col-md-4) -> Sejajar di Baris ke-2 --}}
+                            <div class="col-md-4 d-flex align-items-end gap-2">
+                                <a href="{{ route('attendance-monthly.index') }}" class="btn btn-secondary px-3 flex-fill">Reset</a>
+                                <button type="submit" class="btn btn-primary px-3 flex-fill d-inline-flex align-items-center justify-content-center gap-1">
                                     <iconify-icon icon="solar:filter-bold"></iconify-icon>
                                     Apply Filter
                                 </button>
                             </div>
+
                         </div>
                     </form>
                 </div>
@@ -337,41 +359,58 @@ thead .sticky-col-2 {
     </div>
 </div>
 
-{{-- JAVASCRIPT AUTOMATION CUT-OFF --}}
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const monthSelect = document.querySelector('select[name="month"]');
-    const yearSelect = document.querySelector('select[name="year"]');
-    const startDateInput = document.querySelector('input[name="start_date"]');
-    const endDateInput = document.querySelector('input[name="end_date"]');
+    const companySelect = document.querySelector('select[name="company_id"]');
+    const employeeSelect = document.querySelector('select[name="employee_id"]');
 
-    function updateCutoffDates() {
-        const selectedMonth = parseInt(monthSelect.value);
-        const selectedYear = parseInt(yearSelect.value);
+    if (companySelect && employeeSelect) {
+        // Simpan semua opsi karyawan asli saat halaman pertama kali dimuat
+        const allEmployeeOptions = Array.from(employeeSelect.options);
 
-        if (!selectedMonth || !selectedYear) return;
+        function filterEmployees() {
+            const selectedCompanyId = companySelect.value;
+            const currentSelectedEmployee = employeeSelect.value;
 
-        const endMonthStr = String(selectedMonth).padStart(2, '0');
-        const endDateStr = `${selectedYear}-${endMonthStr}-25`;
+            // Kosongkan dropdown karyawan
+            employeeSelect.innerHTML = '';
 
-        let startMonth = selectedMonth - 1;
-        let startYear = selectedYear;
+            // Masukkan kembali opsi default "-- Semua Karyawan --"
+            const defaultOption = allEmployeeOptions.find(option => option.value === "");
+            if (defaultOption) {
+                employeeSelect.appendChild(defaultOption.cloneNode(true));
+            }
 
-        if (startMonth === 0) {
-            startMonth = 12;
-            startYear = selectedYear - 1;
+            // Masukkan hanya karyawan yang sesuai dengan company_id yang dipilih
+            allEmployeeOptions.forEach(option => {
+                if (option.value !== "") {
+                    const employeeCompanyId = option.getAttribute('data-company');
+                    
+                    // Jika perusahaan belum dipilih (semua), atau company_id cocok
+                    if (!selectedCompanyId || employeeCompanyId === selectedCompanyId) {
+                        employeeSelect.appendChild(option.cloneNode(true));
+                    }
+                }
+            });
+
+            // Pertahankan pilihan karyawan sebelumnya jika masih valid di perusahaan tersebut
+            if (currentSelectedEmployee) {
+                employeeSelect.value = currentSelectedEmployee;
+                if (employeeSelect.value !== currentSelectedEmployee) {
+                    employeeSelect.value = ""; // Reset jika karyawan tersebut tidak ada di company terpilih
+                }
+            }
         }
 
-        const startMonthStr = String(startMonth).padStart(2, '0');
-        const startDateStr = `${startYear}-${startMonthStr}-26`;
+        // Jalankan fungsi saat dropdown perusahaan diubah
+        companySelect.addEventListener('change', filterEmployees);
 
-        startDateInput.value = startDateStr;
-        endDateInput.value = endDateStr;
+        // Jalankan sekali saat halaman dimuat (jaga-jaga jika halaman direload dengan kondisi perusahaan terpilih)
+        if (companySelect.value) {
+            filterEmployees();
+        }
     }
-
-    monthSelect.addEventListener('change', updateCutoffDates);
-    yearSelect.addEventListener('change', updateCutoffDates);
 });
 </script>
 @endpush
