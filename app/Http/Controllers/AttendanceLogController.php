@@ -78,13 +78,18 @@ class AttendanceLogController extends Controller
 
     public function create()
     {
+        $companies = Company::where('is_active', true)->orderBy('name')->get();
+
         $employees = Employee::orderBy(
             'full_name'
         )->get();
 
+        // Default company ID sesuai user yang login (jika relasi user->employee->company_id ada)
+        $defaultCompanyId = auth()->user()->employee->company_id ?? null;
+
         return view(
             'attendance-logs.create',
-            compact('employees')
+            compact('employees', 'companies', 'defaultCompanyId')
         );
     }
 
