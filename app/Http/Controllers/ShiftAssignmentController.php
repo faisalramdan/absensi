@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ShiftAssignment;
 use App\Models\Shift;
 use App\Models\Employee;
+use App\Models\Company;
 use App\Models\Holiday; // 1. IMPORT MODEL HOLIDAY DI SINI
 use Illuminate\Http\Request;
 use Carbon\Carbon;
@@ -21,6 +22,8 @@ class ShiftAssignmentController extends Controller
      */
     public function index(Request $request)
     {
+        $companies = Company::all();
+
         // Tangkap filter bulan & tahun. Jika kosong, default ke bulan & tahun sekarang
         $chosenMonth = $request->input('month', date('m'));
         $chosenYear = $request->input('year', date('Y'));
@@ -46,7 +49,14 @@ class ShiftAssignmentController extends Controller
             ->pluck('name', 'date_applied')
             ->toArray();
 
-        // 🌟 1. Ambil SEMUA karyawan aktif untuk kebutuhan list Dropdown di View
+        // 🌟 LOGIKA BARU: Tentukan Perusahaan yang sedang terpilih (Sama dengan logika Blade)
+        $selectedCompanyId = $request->input('company_id');
+        if (!$request->has('company_id')) {
+            // Jika baru pertama kali buka halaman (belum klik filter), samakan dengan company user login
+            $selectedCompanyId = auth()->user()->company_id ?? (auth()->user()->employee->company_id ?? null);
+        }
+
+        // 🌟 1. Ambil SEMUA karyawan aktif untuk kebutuhan list Dropdown di View (agar JS bisa memfilter)
         $allActiveEmployees = Employee::where('is_active', true)
             ->orderBy('full_name', 'asc')
             ->get();
@@ -55,6 +65,11 @@ class ShiftAssignmentController extends Controller
         $selectedEmployeeId = $request->input('employee_id'); // Mengambil id dari dropdown
 
         $employees = Employee::where('is_active', true)
+            // Tambahan: Filter berdasarkan Perusahaan
+            ->when($selectedCompanyId, function ($query) use ($selectedCompanyId) {
+                $query->where('company_id', $selectedCompanyId);
+            })
+            // Filter berdasarkan Karyawan Spesifik (jika dipilih)
             ->when($selectedEmployeeId, function ($query) use ($selectedEmployeeId) {
                 $query->where('id', $selectedEmployeeId);
             })
@@ -87,8 +102,9 @@ class ShiftAssignmentController extends Controller
             }
         }
 
-        // 🌟 Kirim variabel $allActiveEmployees ke View
+        // 🌟 Kirim variabel ke View
         return view('assignments.index', compact(
+            'companies',
             'employees',
             'allActiveEmployees',
             'dates',
@@ -105,10 +121,11 @@ class ShiftAssignmentController extends Controller
      */
     public function create()
     {
+        $companies = Company::all();
         $shifts = Shift::orderBy('name', 'asc')->get();
         $employees = Employee::where('is_active', true)->orderBy('full_name', 'asc')->get();
 
-        return view('assignments.create', compact('shifts', 'employees'));
+        return view('assignments.create', compact('companies', 'shifts', 'employees'));
     }
 
     /**
@@ -216,28 +233,36 @@ class ShiftAssignmentController extends Controller
             $month = $request->input('month', date('m'));
             $year = $request->input('year', date('Y'));
 
+            // 🌟 1. Tangkap parameter company_id dari AJAX
+            $companyId = $request->input('company_id');
+
             $endDateString = "{$year}-{$month}-25 23:59:59";
             $startTime = strtotime("-1 month", strtotime("{$year}-{$month}-26"));
             $startDateString = date('Y-m-d 00:00:00', $startTime);
 
-            // 1. Ambil ID karyawan yang sudah punya jadwal di periode ini
+            // 2. Ambil ID karyawan yang sudah punya jadwal di periode ini
             $bookedEmployeeIds = \DB::table('shift_assignments')
                 ->whereBetween('date', [$startDateString, $endDateString])
                 ->pluck('employee_id')
                 ->unique()
                 ->toArray();
 
-            // 2. Query tabel employees dan FILTER HANYA YANG AKTIF (`is_active` = true)
+            // 3. Query tabel employees dan FILTER HANYA YANG AKTIF (`is_active` = true)
             $query = \DB::table('employees')
-                ->where('is_active', true) // 🌟 Perubahan di sini: Hanya karyawan aktif
+                ->where('is_active', true)
                 ->orderBy('full_name', 'asc');
 
-            // 3. Singkirkan karyawan yang sudah punya jadwal
+            // 🌟 2. LOGIKA BARU: Filter berdasarkan Perusahaan jika perusahaan terpilih
+            if (!empty($companyId)) {
+                $query->where('company_id', $companyId);
+            }
+
+            // 4. Singkirkan karyawan yang sudah punya jadwal
             if (!empty($bookedEmployeeIds)) {
                 $query->whereNotIn('id', $bookedEmployeeIds);
             }
 
-            // 4. Ambil data hasil filter
+            // 5. Ambil data hasil filter
             $availableEmployees = $query->get(['id', 'full_name', 'nik']);
 
             return response()->json($availableEmployees);

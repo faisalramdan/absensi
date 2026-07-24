@@ -31,7 +31,6 @@
 
                                     <div class="row g-4">
 
-
                                         <div class="col-md-4">
                                             <label class="form-label fw-semibold">Pilih Shift Kerja <span
                                                     class="text-danger">*</span></label>
@@ -83,8 +82,6 @@
                                                 required>
                                         </div>
 
-
-
                                         <div class="col-md-12">
                                             <label class="form-label fw-semibold d-block mb-2">Pengecualian Hari
                                                 Libur</label>
@@ -108,6 +105,27 @@
                                             </div>
                                             <small class="text-muted d-block mt-1 fs-12">Jika tidak dicentang, sistem secara
                                                 otomatis akan melewati (skip) hari tersebut.</small>
+                                        </div>
+
+                                        {{-- 🌟 TAMBAHAN: PILIH PERUSAHAAN --}}
+                                        <div class="col-md-12">
+                                            <label class="form-label fw-semibold">Pilih Perusahaan <span
+                                                    class="text-danger">*</span></label>
+                                            @php
+                                                // Logika otomatis pilih perusahaan berdasarkan user login
+                                                $selectedCompany = auth()->user()->company_id ?? (auth()->user()->employee->company_id ?? null);
+                                            @endphp
+                                            <select name="company_id" id="company_select" class="form-select" required>
+                                                <option value="">-- Pilih Perusahaan --</option>
+                                                {{-- Pastikan variabel $companies sudah dikirim dari Controller --}}
+                                                @if(isset($companies))
+                                                    @foreach($companies as $company)
+                                                        <option value="{{ $company->id }}" {{ $selectedCompany == $company->id ? 'selected' : '' }}>
+                                                            {{ $company->name }}
+                                                        </option>
+                                                    @endforeach
+                                                @endif
+                                            </select>
                                         </div>
 
                                         <div class="col-md-12">
@@ -157,6 +175,7 @@
             const employeeSelect = document.getElementById('employee_select');
             const planMonth = document.getElementById('plan_month');
             const planYear = document.getElementById('plan_year');
+            const companySelect = document.getElementById('company_select'); // 🌟 Ambil elemen perusahaan
             const startDateInput = document.getElementById('start_date');
             const endDateInput = document.getElementById('end_date');
             const infoText = document.getElementById('employee_count_info');
@@ -167,8 +186,14 @@
             function updatePeriodAndEmployees() {
                 const month = planMonth.value;
                 const year = planYear.value;
+                const companyId = companySelect.value; // 🌟 Ambil ID Perusahaan yang sedang dipilih
 
-                if (!month || !year) return;
+                if (!month || !year || !companyId) {
+                    // Jika perusahaan belum dipilih, kosongkan list
+                    employeeSelect.innerHTML = '<option value="" disabled>Silakan pilih perusahaan terlebih dahulu...</option>';
+                    infoText.textContent = "Menunggu pilihan perusahaan.";
+                    return;
+                }
 
                 // Set Tanggal Selesai (25 Bulan Terpilih)
                 const endDateStr = `${year}-${String(month).padStart(2, '0')}-25`;
@@ -194,17 +219,17 @@
                 infoText.textContent = "Menghitung ulang daftar karyawan...";
                 employeeSelect.innerHTML = '<option value="" disabled>Sedang memuat data...</option>';
 
-                fetch(`{{ route('assignments.available-employees') }}?month=${month}&year=${year}`)
+                // 🌟 Kirim parameter company_id ke URL AJAX
+                fetch(`{{ route('assignments.available-employees') }}?month=${month}&year=${year}&company_id=${companyId}`)
                     .then(response => response.json())
                     .then(data => {
                         employeeSelect.innerHTML = ''; // bersihkan status loading
 
                         if (data.length === 0) {
-                            infoText.textContent = "Semua karyawan sudah memiliki jadwal pada periode ini.";
+                            infoText.textContent = "Semua karyawan di perusahaan ini sudah memiliki jadwal pada periode ini.";
                             return;
                         }
 
-                        // KODE YANG BENAR
                         infoText.textContent = `Terdapat ${data.length} karyawan yang belum memiliki jadwal.`;
 
                         // Isi opsi dropdown karyawan baru
@@ -224,14 +249,17 @@
             // Jalankan otomatis saat form dibuka pertama kali
             updatePeriodAndEmployees();
 
-            // Jalankan setiap kali dropdown Bulan atau Tahun diganti
+            // Jalankan setiap kali dropdown Bulan, Tahun, atau PERUSAHAAN diganti
             planMonth.addEventListener('change', updatePeriodAndEmployees);
             planYear.addEventListener('change', updatePeriodAndEmployees);
+            if (companySelect) {
+                companySelect.addEventListener('change', updatePeriodAndEmployees); // 🌟 Trigger jika perusahaan diganti
+            }
 
             // 2. Logika Tombol Pilih Semua Karyawan
             if (btnSelectAll && employeeSelect) {
                 btnSelectAll.addEventListener('click', function () {
-                    if (employeeSelect.options.length === 0) return;
+                    if (employeeSelect.options.length === 0 || employeeSelect.options[0].disabled) return;
 
                     isAllSelected = !isAllSelected;
 

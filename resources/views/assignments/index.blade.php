@@ -57,53 +57,84 @@
                     </div>
                 @endif
 
-                <div class="card border-0 shadow-sm mb-4">
-                    <div class="card-body">
-                        <form method="GET" action="{{ route('assignments.index') }}">
-                            <div class="row g-3 align-items-end">
-                                <div class="col-md-4">
-                                    <label class="form-label fw-semibold">Pilih Karyawan</label>
-                                    <select name="employee_id" class="form-select">
-                                        <option value="">-- Semua Karyawan --</option>
-                                        @foreach($allActiveEmployees as $emp)
-                                            <option value="{{ $emp->id }}" {{ request('employee_id') == $emp->id ? 'selected' : '' }}>
-                                                {{ $emp->full_name }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                </div>
+                
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <form method="GET" action="{{ route('assignments.index') }}">
+                        <div class="row g-3 align-items-end">
+                            
+                            {{-- 1. Kolom Filter Company --}}
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold">Pilih Perusahaan</label>
+                                
+                                @php
+                                    if (request()->has('company_id')) {
+                                        $selectedCompany = request('company_id');
+                                    } else {
+                                        $selectedCompany = auth()->user()->company_id ?? (auth()->user()->employee->company_id ?? null);
+                                    }
+                                @endphp
 
-                                <div class="col-md-3">
-                                    <label class="form-label fw-semibold">Bulan</label>
-                                    <select name="month" class="form-select">
-                                        @foreach(range(1, 12) as $m)
-                                            @php
-                                                $monthName = \Carbon\Carbon::create(2000, $m, 1)->translatedFormat('F');
-                                                // Default ke bulan berjalan saat ini atau sesuai request filter
-                                                $selected = request('month', date('m')) == $m ? 'selected' : '';
-                                            @endphp
-                                            <option value="{{ sprintf('%02d', $m) }}" {{ $selected }}>{{ $monthName }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-
-                                <div class="col-md-2">
-                                    <label class="form-label fw-semibold">Tahun</label>
-                                    <select name="year" class="form-select">
-                                        @foreach(range(date('Y') - 1, date('Y') + 2) as $y)
-                                            <option value="{{ $y }}" {{ request('year', date('Y')) == $y ? 'selected' : '' }}>{{ $y }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-
-                                <div class="col-md-3 d-flex gap-2">
-                                    <button type="submit" class="btn btn-primary w-100">Filter</button>
-                                    <a href="{{ route('assignments.index') }}" class="btn btn-secondary w-100">Reset</a>
-                                </div>
+                                {{-- Tambahkan id="company_id" untuk Javascript --}}
+                                <select name="company_id" id="company_id" class="form-select">
+                                    <option value="">Semua Perusahaan</option>
+                                    @foreach($companies as $company)
+                                        <option value="{{ $company->id }}" {{ $selectedCompany == $company->id ? 'selected' : '' }}>
+                                            {{ $company->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
                             </div>
-                        </form>
-                    </div>
+
+                            {{-- 2. Kolom Filter Karyawan --}}
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold">Pilih Karyawan</label>
+                                
+                                {{-- Tambahkan id="employee_id" untuk Javascript --}}
+                                <select name="employee_id" id="employee_id" class="form-select">
+                                    <option value="">-- Semua Karyawan --</option>
+                                    @foreach($allActiveEmployees as $emp)
+                                        {{-- Kita simpan company_id di atribut data-company-id --}}
+                                        <option value="{{ $emp->id }}" data-company-id="{{ $emp->company_id }}">
+                                            {{ $emp->full_name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            {{-- 3. Kolom Filter Bulan --}}
+                            <div class="col-md-2">
+                                <label class="form-label fw-semibold">Bulan</label>
+                                <select name="month" class="form-select">
+                                    @foreach(range(1, 12) as $m)
+                                        @php
+                                            $monthName = \Carbon\Carbon::create(2000, $m, 1)->translatedFormat('F');
+                                            $selected = request('month', date('m')) == $m ? 'selected' : '';
+                                        @endphp
+                                        <option value="{{ sprintf('%02d', $m) }}" {{ $selected }}>{{ $monthName }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            {{-- 4. Kolom Filter Tahun --}}
+                            <div class="col-md-2">
+                                <label class="form-label fw-semibold">Tahun</label>
+                                <select name="year" class="form-select">
+                                    @foreach(range(date('Y') - 1, date('Y') + 2) as $y)
+                                        <option value="{{ $y }}" {{ request('year', date('Y')) == $y ? 'selected' : '' }}>{{ $y }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            {{-- 5. Kolom Tombol --}}
+                            <div class="col-md-2 d-flex gap-2">
+                                <button type="submit" class="btn btn-primary w-100">Filter</button>
+                                <a href="{{ route('assignments.index') }}" class="btn btn-secondary w-100">Reset</a>
+                            </div>
+                        </div>
+                    </form>
                 </div>
+            </div>
 
                 <div class="card">
                     <div class="d-flex card-header justify-content-between align-items-center">
@@ -203,6 +234,51 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+
+        // =========================================================
+        // 1. LOGIKA FILTER DINAMIS (PERUSAHAAN -> KARYAWAN)
+        // =========================================================
+        const companySelect = document.getElementById("company_id");
+        const employeeSelect = document.getElementById("employee_id");
+        
+        // Memastikan elemen ada agar tidak error
+        if (companySelect && employeeSelect) {
+            const allEmployeeOptions = Array.from(employeeSelect.options);
+            const oldEmployeeSelected = "{{ request('employee_id') }}";
+
+            function updateEmployeeList() {
+                const selectedCompany = companySelect.value;
+                employeeSelect.innerHTML = "";
+
+                allEmployeeOptions.forEach(option => {
+                    if (option.value === "") {
+                        employeeSelect.appendChild(option);
+                        return;
+                    }
+
+                    const employeeCompanyId = option.getAttribute("data-company-id");
+                    if (selectedCompany === "" || employeeCompanyId === selectedCompany) {
+                        employeeSelect.appendChild(option);
+                    }
+                });
+
+                if (oldEmployeeSelected) {
+                    employeeSelect.value = oldEmployeeSelected;
+                }
+            }
+
+            companySelect.addEventListener("change", function() {
+                updateEmployeeList();
+                employeeSelect.value = ""; 
+            });
+
+            updateEmployeeList();
+        }
+
+
+        // =========================================================
+        // 2. LOGIKA UPDATE JADWAL INLINE (BAWAAN ANDA)
+        // =========================================================
         const selects = document.querySelectorAll('.inline-shift-select');
 
         selects.forEach(select => {
