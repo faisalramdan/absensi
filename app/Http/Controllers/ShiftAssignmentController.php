@@ -22,7 +22,7 @@ class ShiftAssignmentController extends Controller
      */
     public function index(Request $request)
     {
-        $companies = Company::all();
+        $companies = Company::where('is_active', true)->orderBy('name')->get();
 
         // Tangkap filter bulan & tahun. Jika kosong, default ke bulan & tahun sekarang
         $chosenMonth = $request->input('month', date('m'));

@@ -27,7 +27,7 @@ class EmployeeContractController extends Controller
     public function index(Request $request)
     {
 
-        $companies = Company::all();
+        $companies = Company::where('is_active', true)->orderBy('name')->get();
         // Ambil kata kunci pencarian dan filter status jika ada
         $search = $request->input('search');
         $selectedStatus = $request->input('employee_status_id');

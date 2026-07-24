@@ -13,7 +13,7 @@ class AttendanceMonthlyController extends Controller
 {
     public function index(Request $request)
     {
-        $companies = Company::all();
+        $companies = Company::where('is_active', true)->orderBy('name')->get();
 
         // Mengambil semua karyawan aktif untuk dropdown filter di view
         $employees = Employee::where('is_active', true)

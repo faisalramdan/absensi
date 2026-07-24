@@ -14,7 +14,7 @@ class AttendanceController extends Controller
     public function index(Request $request)
     {
 
-        $companies = Company::all();
+        $companies = Company::where('is_active', true)->orderBy('name')->get();
 
         // Mengambil daftar karyawan yang aktif untuk filter dropdown pada view
         $employees = Employee::where('is_active', true)
