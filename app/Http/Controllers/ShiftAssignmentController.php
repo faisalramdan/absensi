@@ -121,7 +121,7 @@ class ShiftAssignmentController extends Controller
      */
     public function create()
     {
-        $companies = Company::all();
+        $companies = Company::where('is_active', true)->orderBy('name')->get();
         $shifts = Shift::orderBy('name', 'asc')->get();
         $employees = Employee::where('is_active', true)->orderBy('full_name', 'asc')->get();
 
