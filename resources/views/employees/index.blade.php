@@ -58,10 +58,23 @@
                                     <label class="form-label fw-semibold">
                                         Perusahaan
                                     </label>
+                                    
+                                    @php
+                                        // LOGIKA AUTO-SELECT COMPANY:
+                                        // Jika URL memiliki parameter '?company_id=', ikuti pilihan filter dari URL.
+                                        // Jika URL bersih (halaman baru dibuka/reset), otomatis ambil company dari User Login.
+                                        if (request()->has('company_id')) {
+                                            $selectedCompany = request('company_id');
+                                        } else {
+                                            // Cek company_id dari tabel users ATAU dari relasi tabel employees
+                                            $selectedCompany = auth()->user()->company_id ?? (auth()->user()->employee->company_id ?? null);
+                                        }
+                                    @endphp
+
                                     <select name="company_id" class="form-select">
                                         <option value="">Semua Perusahaan</option>
                                         @foreach($companies as $company)
-                                            <option value="{{ $company->id }}" {{ request('company_id') == $company->id ? 'selected' : '' }}>
+                                            <option value="{{ $company->id }}" {{ $selectedCompany == $company->id ? 'selected' : '' }}>
                                                 {{ $company->name }}
                                             </option>
                                         @endforeach

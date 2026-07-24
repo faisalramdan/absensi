@@ -26,21 +26,18 @@
                     </div>
                 @endif
                 <div class="card border-0 shadow-sm mb-4">
-
                     <div class="card-header d-flex align-items-center">
-                        <iconify-icon icon="solar:filter-bold-duotone" class="text-primary me-2 fs-20">
-                        </iconify-icon>
-
+                        <iconify-icon icon="solar:filter-bold-duotone" class="text-primary me-2 fs-20"></iconify-icon>
                         <h5 class="mb-0 fw-semibold">
                             Filter Kontrak
                         </h5>
                     </div>
 
                     <div class="card-body">
-
                         <form method="GET" action="{{ route('employee-contracts.index') }}">
                             <div class="row g-3">
 
+                                {{-- 1. Kolom Pencarian --}}
                                 <div class="col-md-4">
                                     <label class="form-label fw-semibold">
                                         Cari Nama, NIK atau No. Kontrak
@@ -55,6 +52,32 @@
                                     </div>
                                 </div>
 
+                                {{-- 2. Kolom Filter Perusahaan (Auto-select berdasarkan User Login) --}}
+                                <div class="col-md-3">
+                                    <label class="form-label fw-semibold">
+                                        Perusahaan
+                                    </label>
+                                    
+                                    @php
+                                        // Logika otomatis pilih perusahaan
+                                        if (request()->has('company_id')) {
+                                            $selectedCompany = request('company_id');
+                                        } else {
+                                            $selectedCompany = auth()->user()->company_id ?? (auth()->user()->employee->company_id ?? null);
+                                        }
+                                    @endphp
+
+                                    <select name="company_id" class="form-select">
+                                        <option value="">Semua Perusahaan</option>
+                                        @foreach($companies as $company)
+                                            <option value="{{ $company->id }}" {{ $selectedCompany == $company->id ? 'selected' : '' }}>
+                                                {{ $company->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                {{-- 3. Kolom Filter Status Karyawan --}}
                                 <div class="col-md-3">
                                     <label class="form-label fw-semibold">
                                         Status Karyawan
@@ -69,6 +92,7 @@
                                     </select>
                                 </div>
 
+                                {{-- 4. Kolom Tombol --}}
                                 <div class="col-md-2">
                                     <label class="form-label d-block">
                                         &nbsp;
@@ -85,9 +109,7 @@
 
                             </div>
                         </form>
-
                     </div>
-
                 </div>
 
                 <div class="row">
@@ -235,6 +257,7 @@
                         </div>
                     </div>
                 </div>
+                
             </div>
         </div>
     </div>

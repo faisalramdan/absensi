@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Employee;
 use App\Models\EmployeeContract;
 use App\Models\EmployeeStatus;
+use App\Models\Company;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -25,6 +26,8 @@ class EmployeeContractController extends Controller
      */
     public function index(Request $request)
     {
+
+        $companies = Company::all();
         // Ambil kata kunci pencarian dan filter status jika ada
         $search = $request->input('search');
         $selectedStatus = $request->input('employee_status_id');
@@ -56,7 +59,7 @@ class EmployeeContractController extends Controller
         // Disamakan menjadi $statusId agar cocok dengan variabel di blade: @foreach($statusId as $status)
         $statusId = EmployeeStatus::where('is_active', true)->orderBy('name')->get();
 
-        return view('employee-contracts.index', compact('contracts', 'statusId'));
+        return view('employee-contracts.index', compact('contracts', 'statusId', 'companies'));
     }
 
     /**

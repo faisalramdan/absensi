@@ -83,7 +83,7 @@
                         </h3>
 
                         <p class="text-muted mb-0">
-                            Generate Attendance Daily berdasarkan Attendance Log, Shift, Hari Libur dan Cuti.
+                            Generate Attendance Daily berdasarkan Attendance Log, Shift, Hari Libur , Izin dan Cuti.
                         </p>
 
                     </div>
@@ -169,7 +169,7 @@
 
                                         <strong>
 
-                                            Periode Payroll
+                                            Periode Absensi yang diproses
 
                                         </strong>
 
@@ -312,11 +312,11 @@
             btn.disabled = true;
 
             btn.innerHTML = `
-            <span class="spinner-border spinner-border-sm me-1"
-                  role="status"
-                  aria-hidden="true"></span>
-            Processing Attendance...
-        `;
+                        <span class="spinner-border spinner-border-sm me-1"
+                              role="status"
+                              aria-hidden="true"></span>
+                        Processing Attendance...
+                    `;
 
         });
 
