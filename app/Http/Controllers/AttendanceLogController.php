@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AttendanceLog;
 use App\Models\Employee;
+use App\Models\Company;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Maatwebsite\Excel\Facades\Excel;
@@ -15,16 +16,20 @@ class AttendanceLogController extends Controller
 {
     public function index(Request $request)
     {
-        // 1. Ambil data semua karyawan untuk dropdown (NIK & Nama)
-        $employees = Employee::orderBy('full_name', 'asc')->get(['id', 'nik', 'full_name']);
+        $companies = Company::where('is_active', true)->orderBy('name')->get();
 
-        // 2. Set default Bulan dan Tahun jika tidak ada filter yang dipilih
+        // ❌ SALAH (Jangan dibatasi dengan where di sini, karena akan hilang jika perusahaan diganti)
+        // $employees = Employee::where('company_id', $selectedCompany)->get();
+
+        // ✅ BENAR (Ambil SEMUA karyawan aktif beserta company_id nya agar bisa difilter di JavaScript)
+        $employees = Employee::orderBy('full_name', 'asc')->get(['id', 'nik', 'full_name', 'company_id']);
+
+        $selectedCompany = $request->input('company_id');
+        $selectedEmployee = $request->input('employee_id');
         $selectedMonth = $request->input('month', Carbon::now()->format('m'));
         $selectedYear = $request->input('year', Carbon::now()->format('Y'));
-        $selectedEmployee = $request->input('employee_id');
 
         // 3. Hitung rentang tanggal (Cut-off: 26 Bulan Lalu s/d 25 Bulan Terpilih)
-        // Contoh: Jika memilih Juni 2026, rentangnya 26 Mei 2026 - 25 Juni 2026
         $dateSelected = Carbon::createFromDate($selectedYear, $selectedMonth, 1);
 
         $startDate = $dateSelected->copy()->subMonth()->day(26)->startOfDay();
@@ -37,8 +42,15 @@ class AttendanceLogController extends Controller
         // 4. Query Attendance Logs
         $attendanceLogs = AttendanceLog::query();
 
+        // Filter berdasarkan Perusahaan (melalui relasi employee)
+        if (!empty($selectedCompany)) {
+            $attendanceLogs->whereHas('employee', function ($query) use ($selectedCompany) {
+                $query->where('company_id', $selectedCompany);
+            });
+        }
+
         // Filter berdasarkan Karyawan (jika pilih karyawan tertentu)
-        if ($request->filled('employee_id')) {
+        if (!empty($selectedEmployee)) {
             $attendanceLogs->where('employee_id', $selectedEmployee);
         }
 
@@ -47,16 +59,18 @@ class AttendanceLogController extends Controller
 
         // Eksekusi query & pagination
         $attendanceLogs = $attendanceLogs
-            ->with(['employee'])
+            ->with(['employee.company']) // Load relasi employee beserta company-nya agar tidak N+1 query
             ->latest('date')
             ->paginate(10)
             ->withQueryString();
 
         return view('attendance-logs.index', compact(
             'attendanceLogs',
+            'companies',
             'employees',
             'selectedMonth',
             'selectedYear',
+            'selectedCompany',   // <-- Jangan lupa sertakan ini ke compact
             'selectedEmployee',
             'dateRangeText'
         ));

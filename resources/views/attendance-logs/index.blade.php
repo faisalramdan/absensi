@@ -37,14 +37,29 @@
                         <form method="GET">
                             <div class="row align-items-end g-3">
 
-                                {{-- 1. Pilih Karyawan --}}
-                                <div class="col-md-4">
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold text-primary small">Perusahaan</label>
+                                <select name="company_id" id="company_id" class="form-select border-primary-subtle">
+                                    <option value="">-- Semua Perusahaan --</option>
+                                    @php
+                                        $defaultCompany = request('company_id', auth()->user()->employee?->company_id ?? auth()->user()->company_id ?? '');
+                                    @endphp
+                                    @foreach($companies as $company)
+                                        <option value="{{ $company->id }}" @selected($defaultCompany == $company->id)>
+                                            {{ $company->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>    
+                            
+                            {{-- 1. Pilih Karyawan --}}
+                                <div class="col-md-3">
                                     <label class="form-label fw-semibold">Pilih Karyawan</label>
-                                    <select name="employee_id" class="form-select">
-                                        <option value="">-- Semua Karyawan --</option>
-                                        @foreach($employees as $employee)
-                                            <option value="{{ $employee->id }}" {{ $selectedEmployee == $employee->id ? 'selected' : '' }}>
-                                                [{{ $employee->nik }}] {{ $employee->full_name }}
+                                    <select name="employee_id" id="employee_id" class="form-select">
+                                        <option value="">Semua Karyawan</option>
+                                        @foreach($employees as $emp)
+                                            <option value="{{ $emp->id }}" data-company-id="{{ $emp->company_id }}" {{ request('employee_id') == $emp->id ? 'selected' : '' }}>
+                                                {{ $emp->nik }} - {{ $emp->full_name }}
                                             </option>
                                         @endforeach
                                     </select>
@@ -262,8 +277,74 @@
     </div>
 
     <script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // =========================================================
+        // 1. LOGIKA FILTER DINAMIS (PERUSAHAAN -> KARYAWAN)
+        // =========================================================
+        const companySelect = document.getElementById("company_id");
+        const employeeSelect = document.getElementById("employee_id");
+        
+        if (companySelect && employeeSelect) {
+            // Ambil data mentah dari opsi HTML ke dalam array JavaScript
+            const originalOptions = Array.from(employeeSelect.options).map(option => ({
+                value: option.value,
+                text: option.text,
+                companyId: option.getAttribute("data-company-id")
+            }));
+
+            const oldEmployeeSelected = "{{ request('employee_id') }}";
+
+            function updateEmployeeList() {
+                const selectedCompany = companySelect.value;
+                
+                // Kosongkan dropdown karyawan
+                employeeSelect.innerHTML = "";
+
+                // Masukkan kembali opsi default ("Semua Karyawan" / "-- Pilih --")
+                const defaultOption = document.createElement("option");
+                defaultOption.value = "";
+                defaultOption.text = "Semua Karyawan"; // Sesuaikan teks default Anda jika berbeda
+                employeeSelect.appendChild(defaultOption);
+
+                // Filter dan masukkan opsi karyawan berdasarkan company_id
+                originalOptions.forEach(opt => {
+                    if (opt.value !== "") {
+                        if (selectedCompany === "" || opt.companyId === selectedCompany) {
+                            const newOption = document.createElement("option");
+                            newOption.value = opt.value;
+                            newOption.textContent = opt.text;
+                            newOption.setAttribute("data-company-id", opt.companyId);
+                            employeeSelect.appendChild(newOption);
+                        }
+                    }
+                });
+
+                // Kembalikan nilai yang sebelumnya dipilih jika ada
+                if (oldEmployeeSelected) {
+                    employeeSelect.value = oldEmployeeSelected;
+                }
+            }
+
+            // Jalankan saat perusahaan diubah
+            companySelect.addEventListener("change", function() {
+                // Reset nilai karyawan yang dipilih saat perusahaan berganti manual
+                // (Kecuali saat load pertama kali di mana oldEmployeeSelected masih dibutuhkan)
+                if (event && event.isTrusted) { 
+                    employeeSelect.value = ""; 
+                }
+                updateEmployeeList();
+            });
+
+            // Jalankan sekali saat halaman pertama kali dimuat untuk sinkronisasi awal
+            updateEmployeeList();
+        }
+
+        // =========================================================
+        // 2. LOGIKA TOMBOL HAPUS DENGAN SWEETALERT
+        // =========================================================
         document.querySelectorAll('.btn-delete').forEach(button => {
-            button.addEventListener('click', function () {
+            button.addEventListener('click', function (e) {
+                e.preventDefault();
                 let form = this.closest('form');
 
                 Swal.fire({
@@ -280,5 +361,6 @@
                 });
             });
         });
-    </script>
+    });
+</script>
 @endsection
