@@ -32,26 +32,10 @@
 
                 {{-- Statistic Cards --}}
                 <div class="row">
-                    <div class="col-xl-3 col-md-6">
-                        <div class="card">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <p class="text-muted mb-1">Total User</p>
-                                        <h3 class="mb-0">{{ number_format($totalUsers) }}</h3>
-                                    </div>
-                                    <div class="avatar-md bg-primary-subtle rounded">
-                                        <div class="avatar-title">
-                                            <iconify-icon icon="solar:user-bold-duotone" class="fs-28 text-primary"></iconify-icon>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        </div>
-
-                        <div class="col-xl-3 col-md-6">
-                            <div class="card">
+                    
+                        {{-- 1. Total Karyawan Keseluruhan --}}
+                        <div class="col-xl-4 col-md-6 mb-4">
+                            <div class="card h-100">
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
@@ -68,8 +52,9 @@
                             </div>
                         </div>
 
-                        <div class="col-xl-3 col-md-6">
-                            <div class="card">
+                        {{-- 2. Hadir Hari Ini --}}
+                        <div class="col-xl-4 col-md-6 mb-4">
+                            <div class="card h-100">
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
@@ -86,24 +71,35 @@
                             </div>
                         </div>
 
-                        <div class="col-xl-3 col-md-6">
-                            <div class="card">
+                        {{-- 3. Jumlah Karyawan per Company --}}
+                        <div class="col-xl-4 col-md-12 mb-4">
+                            <div class="card h-100">
                                 <div class="card-body">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <p class="text-muted mb-1">Izin / Cuti</p>
-                                            <h3 class="mb-0">{{ number_format($izinCutiHariIni) }}</h3>
-                                        </div>
-                                        <div class="avatar-md bg-warning-subtle rounded">
-                                            <div class="avatar-title">
-                                                <iconify-icon icon="solar:calendar-mark-bold-duotone" class="fs-28 text-warning"></iconify-icon>
-                                            </div>
-                                        </div>
+                                    <h5 class="card-title text-muted mb-3 font-size-14">Total Karyawan - <b>{{ number_format($totalEmployees) }}</b></h5>
+                                    <div class="table-responsive" style="max-height: 120px; overflow-y: auto;">
+                                        <table class="table table-sm table-borderless mb-0">
+                                            <tbody>
+                                                @forelse($companiesWithEmployeeCount as $comp)
+                                                    <tr>
+                                                        <td><span class="text-dark fw-semibold">{{ $comp->name }}</span></td>
+                                                        <td class="text-end">
+                                                            <span class="badge bg-primary-subtle text-primary px-2 py-1">
+                                                                {{ $comp->employees_count }} Orang
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                @empty
+                                                    <tr>
+                                                        <td colspan="2" class="text-center text-muted">Belum ada data perusahaan</td>
+                                                    </tr>
+                                                @endforelse
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    
 
                     <div class="row">
                         {{-- Attendance Overview --}}

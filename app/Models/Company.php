@@ -34,4 +34,12 @@ class Company extends Model
             Team::class
         );
     }
+
+    public function employees()
+    {
+        return $this->hasMany(Employee::class, 'company_id', 'id');
+
+        // Catatan: Jika nama foreign key di tabel employees Anda berbeda 
+        // (misalnya bukan 'company_id'), silakan sesuaikan parameter di atas.
+    }
 }

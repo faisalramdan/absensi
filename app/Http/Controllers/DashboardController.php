@@ -6,7 +6,7 @@ use App\Models\Employee;
 use App\Models\EmployeeContract;
 use App\Models\LeaveAllocation;
 use App\Models\Attendance;
-use App\Models\User;
+use App\Models\Company;
 use App\Models\LoginActivity;
 use App\Models\LeaveRequest; // Pastikan model ini diimport
 use App\Models\ShiftAssignment;
@@ -268,9 +268,10 @@ class DashboardController extends Controller
     {
         $today = Carbon::today();
 
-        // 1. Data Dasar
-        $totalUsers = User::count();
-        $totalEmployees = Employee::count();
+        // Total Karyawan keseluruhan (j masih diperlukan)
+        $totalEmployees = Employee::where('is_active', true)->count();
+
+
 
         // 2. Data Absensi Hari Ini
         $hadirHariIni = Attendance::whereDate('date', $today)
@@ -344,6 +345,13 @@ class DashboardController extends Controller
             ->take(5)
             ->get();
 
+        // BARU: Mengambil daftar perusahaan beserta jumlah karyawan aktifnya
+        $companiesWithEmployeeCount = Company::withCount([
+            'employees' => function ($query) {
+                $query->where('is_active', true);
+            }
+        ])->get();
+
         // ==========================================
         // 7. Data Cuti Bulan Ini (Approved)
         // ==========================================
@@ -366,8 +374,9 @@ class DashboardController extends Controller
         return view(
             'dashboard.admin',
             compact(
-                'totalUsers',
+
                 'totalEmployees',
+                'companiesWithEmployeeCount',
                 'latestEmployees',
                 'expiringContracts',
                 'latestLogins',

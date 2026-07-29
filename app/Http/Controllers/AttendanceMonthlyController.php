@@ -15,6 +15,15 @@ class AttendanceMonthlyController extends Controller
     {
         $companies = Company::where('is_active', true)->orderBy('name')->get();
 
+        // 1. Ambil company_id milik user yang sedang login
+        $userCompanyId = auth()->user()->employee?->company_id
+            ?? \App\Models\Employee::where('user_id', auth()->id())->value('company_id');
+
+        // 2. Tentukan company_id yang dipakai (dari request/filter atau default user login)
+        $selectedCompanyId = $request->has('company_id')
+            ? $request->company_id
+            : $userCompanyId;
+
         // Mengambil semua karyawan aktif untuk dropdown filter di view
         $employees = Employee::where('is_active', true)
             ->orderBy('full_name')
@@ -62,11 +71,10 @@ class AttendanceMonthlyController extends Controller
             ->orderBy('employees.full_name', 'asc')
             ->select('attendances.*');
 
-        // 🔍 FILTER BARU: Berdasarkan Perusahaan (Company)
-        if ($request->filled('company_id')) {
-            $companyId = $request->company_id;
-            $query->whereHas('employee', function ($q) use ($companyId) {
-                $q->where('company_id', $companyId);
+        // 3. FILTER BARU: Berdasarkan Perusahaan (Company Default Login / Dropdown)
+        if (!empty($selectedCompanyId)) {
+            $query->whereHas('employee', function ($q) use ($selectedCompanyId) {
+                $q->where('company_id', $selectedCompanyId);
             });
         }
 
@@ -196,11 +204,6 @@ class AttendanceMonthlyController extends Controller
         | Pembuatan Data Atas (Seksi Card Dasbor)
         |--------------------------------------------------------------------------
         */
-        /*
-        |--------------------------------------------------------------------------
-        | Pembuatan Data Atas (Seksi Card Dasbor)
-        |--------------------------------------------------------------------------
-        */
         $totalLateMinutes = $summary->sum('late_minutes');
         $totalEarlyLeaveMinutes = $summary->sum('early_leave_minutes');
 
@@ -280,7 +283,8 @@ class AttendanceMonthlyController extends Controller
             'workingDays',
             'calendarDays',
             'sundayCount',
-            'holidayCount'
+            'holidayCount',
+            'selectedCompanyId' // 4. PASTIKAN DIKIRIM KE VIEW
         ));
     }
 

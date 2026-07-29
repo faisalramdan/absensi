@@ -20,9 +20,18 @@ class EmployeeController extends Controller
     public function index(Request $request)
     {
         $employeeStatuses = EmployeeStatus::orderBy('name')->get();
-
-        // TAMBAHKAN INI: Ambil data company untuk di-passing ke dropdown
         $companies = Company::where('is_active', true)->orderBy('name')->get();
+
+        // 1. Ambil company_id milik user yang sedang login dari tabel employees
+        $userCompanyId = auth()->user()->employee?->company_id
+            ?? Employee::where('user_id', auth()->id())->value('company_id');
+
+        // 2. Tentukan company_id yang dipakai:
+        // Jika ada parameter 'company_id' dari request/filter form, gunakan itu.
+        // Jika TIDAK ADA (pertama kali buka halaman), gunakan company_id milik user login sebagai default.
+        $selectedCompanyId = $request->has('company_id')
+            ? $request->company_id
+            : $userCompanyId;
 
         $employees = Employee::query();
 
@@ -35,18 +44,17 @@ class EmployeeController extends Controller
             });
         }
 
-        // TAMBAHKAN INI: Filter Berdasarkan Company
-        if ($request->filled('company_id')) {
-            $employees->where('company_id', $request->company_id);
+        // 3. Terapkan Filter Company jika $selectedCompanyId tidak kosong
+        if (!empty($selectedCompanyId)) {
+            $employees->where('company_id', $selectedCompanyId);
         }
 
-        // Filter Status Karyawan (Pastikan namanya sesuai dengan name di HTML)
+        // Filter Status Karyawan
         if ($request->filled('employee_status_id')) {
             $employees->where('status_id', $request->employee_status_id);
-            // Catatan: sesuaikan 'status_id' dengan nama kolom status di tabel employee Anda
         }
 
-        // Filter Aktif / Non Aktif (Jika masih Anda gunakan)
+        // Filter Aktif / Non Aktif
         if ($request->filled('status')) {
             $employees->where('is_active', $request->status);
         }
@@ -66,8 +74,7 @@ class EmployeeController extends Controller
 
         return view(
             'employees.index',
-            // TAMBAHKAN INI: Pastikan 'companies' ikut dikirim ke view (compact)
-            compact('employees', 'employeeStatuses', 'companies')
+            compact('employees', 'employeeStatuses', 'companies', 'selectedCompanyId')
         );
     }
 

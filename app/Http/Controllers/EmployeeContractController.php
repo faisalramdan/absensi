@@ -26,8 +26,17 @@ class EmployeeContractController extends Controller
      */
     public function index(Request $request)
     {
-
         $companies = Company::where('is_active', true)->orderBy('name')->get();
+
+        // 1. Ambil company_id milik user yang sedang login
+        $userCompanyId = auth()->user()->employee?->company_id
+            ?? \App\Models\Employee::where('user_id', auth()->id())->value('company_id');
+
+        // 2. Tentukan company_id yang dipakai (dari dropdown filter atau default user login)
+        $selectedCompanyId = $request->has('company_id')
+            ? $request->company_id
+            : $userCompanyId;
+
         // Ambil kata kunci pencarian dan filter status jika ada
         $search = $request->input('search');
         $selectedStatus = $request->input('employee_status_id');
@@ -38,6 +47,13 @@ class EmployeeContractController extends Controller
             'creator',
             'updater',
         ])
+            // 3. TAMBAHKAN INI: Logika Filter Berdasarkan Company
+            ->when(!empty($selectedCompanyId), function ($query) use ($selectedCompanyId) {
+                // Memfilter kontrak berdasarkan company_id milik karyawan (relasi)
+                $query->whereHas('employee', function ($q) use ($selectedCompanyId) {
+                    $q->where('company_id', $selectedCompanyId);
+                });
+            })
             // Logika Filter Pencarian (Nama, NIK, No Kontrak)
             ->when($search, function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
@@ -59,7 +75,11 @@ class EmployeeContractController extends Controller
         // Disamakan menjadi $statusId agar cocok dengan variabel di blade: @foreach($statusId as $status)
         $statusId = EmployeeStatus::where('is_active', true)->orderBy('name')->get();
 
-        return view('employee-contracts.index', compact('contracts', 'statusId', 'companies'));
+        return view(
+            'employee-contracts.index',
+            // 4. Pastikan 'selectedCompanyId' ikut dikirim ke View
+            compact('contracts', 'statusId', 'companies', 'selectedCompanyId')
+        );
     }
 
     /**

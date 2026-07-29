@@ -13,8 +13,16 @@ class AttendanceController extends Controller
 {
     public function index(Request $request)
     {
-
         $companies = Company::where('is_active', true)->orderBy('name')->get();
+
+        // 1. Ambil company_id milik user yang sedang login
+        $userCompanyId = auth()->user()->employee?->company_id
+            ?? Employee::where('user_id', auth()->id())->value('company_id');
+
+        // 2. Tentukan company_id yang dipakai (dari request/filter atau default user login)
+        $selectedCompanyId = $request->has('company_id')
+            ? $request->company_id
+            : $userCompanyId;
 
         // Mengambil daftar karyawan yang aktif untuk filter dropdown pada view
         $employees = Employee::where('is_active', true)
@@ -76,13 +84,10 @@ class AttendanceController extends Controller
             $endDate
         ]);
 
-        // Kondisi opsional: Filter berdasarkan Company (Perusahaan)
-        if ($request->filled('company_id')) {
-            $companyId = $request->company_id;
-
-            // Menyaring absensi berdasarkan karyawan yang memiliki company_id tersebut
-            $query->whereHas('employee', function ($q) use ($companyId) {
-                $q->where('company_id', $companyId);
+        // 3. Filter berdasarkan Company (Default User Login / Dropdown pilihan)
+        if (!empty($selectedCompanyId)) {
+            $query->whereHas('employee', function ($q) use ($selectedCompanyId) {
+                $q->where('company_id', $selectedCompanyId);
             });
         }
 
@@ -114,12 +119,12 @@ class AttendanceController extends Controller
                 ->where('status', 'wfa')
                 ->count(),
 
-            // 1. SAKIT: Status 'leave', tag 'izin' di tabel leave_types, dan nama mengandung kata 'sakit'
+            // 1. SAKIT
             'sakit' => (clone $query)
                 ->where('status', 'sick')
                 ->count(),
 
-            // 2. IJIN: Status 'leave', tag 'izin' di tabel leave_types, tetapi BUKAN izin sakit
+            // 2. IJIN
             'ijin' => (clone $query)
                 ->where('status', 'leave')
                 ->whereHas('leaveType', function ($q) {
@@ -128,7 +133,7 @@ class AttendanceController extends Controller
                 })
                 ->count(),
 
-            // 3. CUTI: Status 'leave' dan memiliki tag 'cuti' di tabel leave_types
+            // 3. CUTI
             'cuti' => (clone $query)
                 ->where('status', 'leave')
                 ->whereHas('leaveType', function ($q) {
@@ -141,7 +146,7 @@ class AttendanceController extends Controller
                 ->where('status', 'alpha')
                 ->count(),
 
-            // Menghitung total keterlambatan (is_idt = true DIABAIKAN karena dianggap toleransi)
+            // Menghitung total keterlambatan
             'late' => (clone $query)
                 ->where('late_minutes', '>', 0)
                 ->where(function ($q) {
@@ -150,7 +155,7 @@ class AttendanceController extends Controller
                 })
                 ->count(),
 
-            // Menghitung total pulang cepat (is_ipc = true DIABAIKAN karena dianggap toleransi)
+            // Menghitung total pulang cepat
             'early_leave' => (clone $query)
                 ->where('early_leave_minutes', '>', 0)
                 ->where(function ($q) {
@@ -169,19 +174,19 @@ class AttendanceController extends Controller
                 ->where('forgot_check_out', true)
                 ->count(),
 
-            // Menghitung total hari Libur Nasional yang masuk dalam jadwal kerja
+            // Menghitung total hari Libur Nasional
             'holiday' => (clone $query)
                 ->where('status', 'holiday')
                 ->count(),
 
-            // Menghitung total hari libur regular (misal: jadwal off shift)
+            // Menghitung total hari libur regular
             'off' => (clone $query)
                 ->where('status', 'off')
                 ->count(),
 
             // Menghitung akumulasi menit waktu kerja efektif
             'total_work_minutes' => (clone $query)
-                ->where('status', 'present') // Hanya hitung total efektif dari kehadiran biasa atau disesuaikan
+                ->where('status', 'present')
                 ->sum('work_minutes'),
 
             // Menghitung penanda khusus Izin Pulang Cepat (IPC) murni
@@ -194,7 +199,7 @@ class AttendanceController extends Controller
                 ->where('is_idt', true)
                 ->count(),
 
-            // Menghitung total akumulasi menit keterlambatan (Menit is_idt = true TIDAK DIHITUNG)
+            // Menghitung total akumulasi menit keterlambatan
             'total_late_minutes' => (clone $query)
                 ->where('late_minutes', '>', 0)
                 ->where(function ($q) {
@@ -203,12 +208,7 @@ class AttendanceController extends Controller
                 })
                 ->sum('late_minutes'),
 
-            /*
-|--------------------------------------------------------------------------
-| SUMMARY BARU (DENGAN PROTEKSI IS_IDT DAN IS_IPC)
-|--------------------------------------------------------------------------
-*/
-            // Menghitung berapa kali karyawan kurang jam kerja (Izin IDT/IPC dan WFA/Holiday diabaikan)
+            // Menghitung berapa kali karyawan kurang jam kerja
             'short_work_count' => (clone $query)
                 ->where('short_work_minutes', '>', 0)
                 ->whereNotIn('status', ['wfa', 'holiday', 'off'])
@@ -220,7 +220,7 @@ class AttendanceController extends Controller
                 })
                 ->count(),
 
-            // Menghitung total akumulasi menit kurang jam kerja (Izin IDT/IPC dan WFA/Holiday diabaikan)
+            // Menghitung total akumulasi menit kurang jam kerja
             'total_short_work_minutes' => (clone $query)
                 ->where('short_work_minutes', '>', 0)
                 ->whereNotIn('status', ['wfa', 'holiday', 'off'])
@@ -239,11 +239,9 @@ class AttendanceController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        // Mengonversi total menit keterlambatan ke satuan Jam dan sisa Menit
         $summary['late_hours'] = floor($summary['total_late_minutes'] / 60);
         $summary['late_minutes_remainder'] = $summary['total_late_minutes'] % 60;
 
-        // Menghitung total menit pulang cepat (Menit is_ipc = true TIDAK DIHITUNG)
         $summary['total_early_leave_minutes'] = (clone $query)
             ->where('early_leave_minutes', '>', 0)
             ->where(function ($q) {
@@ -252,7 +250,6 @@ class AttendanceController extends Controller
             })
             ->sum('early_leave_minutes');
 
-        // Mengonversi total menit pulang cepat ke satuan Jam dan sisa Menit
         $summary['early_leave_hours'] = floor($summary['total_early_leave_minutes'] / 60);
         $summary['early_leave_minutes_remainder'] = $summary['total_early_leave_minutes'] % 60;
 
@@ -260,49 +257,41 @@ class AttendanceController extends Controller
         |--------------------------------------------------------------------------
         | Hari Kerja (Kalender Otomatis)
         |--------------------------------------------------------------------------
-        | Menghitung total hari riil, hari minggu, hari libur nasional, dan hari kerja efektif
         */
 
         $workingDays = 0;
         $sundayCount = 0;
         $holidayCount = 0;
 
-        // Menghitung selisih total hari kalender di dalam range tanggal aktif
         $calendarDays = Carbon::parse($startDate)->diffInDays(Carbon::parse($endDate)) + 1;
         $current = Carbon::parse($startDate);
 
-        // Loop harian untuk memeriksa status penanggalan
         while ($current->lte(Carbon::parse($endDate))) {
             if ($current->dayOfWeek == Carbon::SUNDAY) {
-                // Jika hari minggu, masukkan ke counter Off
                 $sundayCount++;
             } else {
-                // Jika bukan hari minggu, cek apakah terdaftar di tabel master Holiday
                 $holiday = Holiday::whereDate('date_applied', $current)->exists();
 
                 if ($holiday) {
                     $holidayCount++;
                 } else {
-                    // Jika bukan minggu dan bukan libur nasional, maka dihitung sebagai Hari Kerja Efektif
                     $workingDays++;
                 }
             }
-            $current->addDay(); // Lanjut ke tanggal berikutnya
+            $current->addDay();
         }
 
         /*
         |--------------------------------------------------------------------------
         | Attendance Table Data
         |--------------------------------------------------------------------------
-        | Mengambil data baris absensi utama untuk ditampilkan dalam bentuk tabel/list
         */
 
         $attendances = $query
             ->orderBy('date', 'desc')
             ->paginate(20)
-            ->withQueryString(); // Memastikan parameter filter request tidak hilang saat pindah halaman paginasi
+            ->withQueryString();
 
-        // Melempar seluruh variabel terproses ke view blade
         return view(
             'attendances.index',
             compact(
@@ -317,7 +306,8 @@ class AttendanceController extends Controller
                 'workingDays',
                 'calendarDays',
                 'sundayCount',
-                'holidayCount'
+                'holidayCount',
+                'selectedCompanyId' // 4. Dikirim ke Blade agar opsi dropdown perusahaan tetap terpilih
             )
         );
     }
