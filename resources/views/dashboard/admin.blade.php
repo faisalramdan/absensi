@@ -176,7 +176,12 @@
                                                             {{ $employee->full_name }} <br>
                                                             <small class="text-muted"><B>NIK :</B> {{ $employee->nik }}</small>
                                                         </td>
-                                                        <td>{{ $employee->position?->name ?? '-' }}</td>
+                                                        <td>{{ $employee->position?->name ?? '-' }} <br>
+                                                            {{-- Tambahan Nama Company di bawah Jabatan --}}
+                                                            <small class="text-muted">
+                                                                <i class="bi bi-building"></i> <B>{{ $employee->company?->name ?? '-' }}</B>
+                                                            </small>
+                                                        </td>
                                                         <td>{{ \Carbon\Carbon::parse($employee->join_date)->format('d M Y') }}</td>
                                                     </tr>
                                                 @empty
@@ -301,7 +306,7 @@
                                                                                     class="img-fluid rounded shadow-lg" 
                                                                                     style="max-height: 70vh; object-fit: contain;">
                                                                                 <h5 class="text-white fw-bold mt-3">{{ $employee->full_name }} ({{ $age }} Tahun)</h5>
-                                                                                <span class="badge bg-light text-dark">{{ $employee->position?->name ?? 'Karyawan' }}</span>
+                                                                                <span class="badge bg-light text-dark">{{ $employee->position?->name ?? 'Karyawan' }} </span>
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -314,11 +319,11 @@
                                                         </div>
 
                                                         <div>
-                                                            <h6 class="mb-0 fw-semibold text-dark">
+                                                            <h5 class="mb-0 fw-semibold text-dark">
                                                                 {{ $employee->full_name }}
-                                                                <small class="text-purple fw-bold ms-1" style="font-size: 11px;">({{ $age }} th)</small>
-                                                            </h6>
-                                                            <small class="text-muted">{{ $employee->position?->name ?? 'Karyawan' }}</small>
+                                                                <small class="text-primary fw-bold ms-1" style="font-size: 12px;">({{ $age }} Tahun)</small>
+                                                            </h5>
+                                                            <small class="text-muted">{{ $employee->position?->name ?? 'Karyawan' }} - {{ $employee->company?->name ?? '-' }}</small>
                                                         </div>
                                                     </div>
                                                     
