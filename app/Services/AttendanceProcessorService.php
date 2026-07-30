@@ -208,15 +208,49 @@ class AttendanceProcessorService
 
         /*
         |--------------------------------------------------------------------------
-        | Required Work Minutes
+        | 1. IDT / IPC Identification Terlebih Dahulu (Wajib di Atas)
         |--------------------------------------------------------------------------
         */
-        $isSaturday = $date->isSaturday();
-        $requiredWorkMinutes = $isSaturday ? 300 : 480;
+        $isIdt = false;
+        $isIpc = false;
+        if ($leaveRequest) {
+            $code = $leaveRequest->leaveType?->code;
+            $isIdt = $code === 'I-IDT';
+            $isIpc = $code === 'I-IPC';
+        }
 
         /*
         |--------------------------------------------------------------------------
-        | Actual Time
+        | 2. Required Work Minutes (Berdasarkan Hari)
+        |--------------------------------------------------------------------------
+        */
+        $dayOfWeek = $date->dayOfWeekIso; // 1 = Senin, 5 = Jumat, 6 = Sabtu
+        $isSaturday = ($dayOfWeek == 6);  // Mengembalikan variabel isSaturday untuk batas acuan di bawah
+
+        if ($dayOfWeek == 5) {
+            // PERBAIKAN: Shift pagi adalah yang masuk di atas jam 4 subuh dan sebelum jam 12 siang.
+            // Ini mencegah Shift Malam (00:00) terbaca sebagai Shift Pagi.
+            $isShiftPagi = $shiftDetail->start_time > '04:00:00' && $shiftDetail->start_time < '12:00:00';
+
+            if ($isShiftPagi) {
+                $requiredWorkMinutes = 510; // Jumat Pagi: Sesuai aturan khusus Anda sebelumnya (510 menit)
+            } else {
+                $requiredWorkMinutes = 480; // Jumat Sore/Malam: Normal 8 Jam (480 menit)
+            }
+        } elseif ($dayOfWeek == 6) {
+            $requiredWorkMinutes = 300; // Sabtu: 5 Jam (300 menit)
+        } else {
+            $requiredWorkMinutes = 480; // Senin - Kamis: 8 Jam (480 menit)
+        }
+
+        // Jika punya izin IDT (Telat) atau IPC (Pulang Cepat), target kerja dikurangi 1 jam (60 menit)
+        if ($isIdt || $isIpc) {
+            $requiredWorkMinutes -= 60;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 3. Actual Time
         |--------------------------------------------------------------------------
         */
         $actualIn = null;
@@ -228,7 +262,7 @@ class AttendanceProcessorService
 
         /*
         |--------------------------------------------------------------------------
-        | Set Batas Acuan Berdasarkan Shift di Database
+        | 4. Set Batas Acuan Berdasarkan Shift di Database
         |--------------------------------------------------------------------------
         */
         $shiftStart = Carbon::parse($startDateStr . ' ' . $shiftDetail->start_time);
@@ -243,7 +277,7 @@ class AttendanceProcessorService
 
         /*
         |--------------------------------------------------------------------------
-        | Target Pulang Dinamis & Kunci Batas Jam Kerja
+        | 5. Target Pulang Dinamis & Kunci Batas Jam Kerja
         |--------------------------------------------------------------------------
         */
         $requiredCheckOut = null;
@@ -275,13 +309,13 @@ class AttendanceProcessorService
 
         /*
         |--------------------------------------------------------------------------
-        | Parse Jam Pulang Aktual & Proteksi Day-Crossing Overlap
+        | 6. Parse Jam Pulang Aktual & Proteksi Day-Crossing Overlap
         |--------------------------------------------------------------------------
         */
         if (!empty($log->check_out)) {
             $actualOut = Carbon::parse($startDateStr . ' ' . $log->check_out);
             if ($actualIn && $actualOut->lt($actualIn)) {
-                $actualOut->addDay();
+                $actualOut->addDay(); // Ini krusial agar jam 07:30 pagi besoknya terbaca dengan benar!
             }
         }
 
@@ -290,14 +324,16 @@ class AttendanceProcessorService
 
         /*
         |--------------------------------------------------------------------------
-        | Perhitungan Keterlambatan
+        | 7. Perhitungan Keterlambatan
         |--------------------------------------------------------------------------
         */
         $lateMinutes = 0;
         if ($actualIn) {
             $actualInTimeStr = $actualIn->format('H:i:s');
             if ($actualInTimeStr > $shiftDetail->late_deadline) {
-                if ($shiftDetail->start_time === '00:00:00' && $actualInTimeStr >= '23:00:00') {
+                // PERBAIKAN: Ubah batas jam malam dari '23:00:00' menjadi '21:00:00' 
+                // agar check-in pukul 22:37 (datang awal/shift malam) tidak dianggap telat
+                if ($shiftDetail->start_time === '00:00:00' && $actualInTimeStr >= '21:00:00') {
                     $lateMinutes = 0;
                 } else {
                     $lateMinutes = $lateDeadline->diffInMinutes($actualIn);
@@ -307,7 +343,7 @@ class AttendanceProcessorService
 
         /*
         |--------------------------------------------------------------------------
-        | Perhitungan Menit Kerja Aktual
+        | 8. Perhitungan Menit Kerja Aktual
         |--------------------------------------------------------------------------
         */
         $workMinutes = 0;
@@ -321,34 +357,44 @@ class AttendanceProcessorService
 
         /*
         |--------------------------------------------------------------------------
-        | Perhitungan Pulang Cepat (Early Leave)
+        | 9. Perhitungan Pulang Cepat (Early Leave)
         |--------------------------------------------------------------------------
         */
         $earlyLeaveMinutes = 0;
-        if ($requiredCheckOut && $actualOut) {
+        // Penambahan $actualIn memastikan yang lupa absen masuk tidak dihitung pulang cepat
+        if ($actualIn && $requiredCheckOut && $actualOut) {
             if ($actualOut->lt($requiredCheckOut)) {
                 $earlyLeaveMinutes = $actualOut->diffInMinutes($requiredCheckOut);
             }
+        }
+
+        // --- TAMBAHAN KODE UNTUK MEMPERBAIKI KASUS SHIFT MALAM ---
+        // Jika total menit kerja (workMinutes) aktual karyawan sudah memenuhi atau melebihi 
+        // target kewajiban jam kerja hari itu (requiredWorkMinutes), maka status Pulang Cepat dihapus (0)
+        if ($workMinutes >= $requiredWorkMinutes) {
+            $earlyLeaveMinutes = 0;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 10. Kompensasi Keterlambatan (IDT) dan Pulang Cepat (IPC)
+        |--------------------------------------------------------------------------
+        */
+        // Jika ada izin IDT, potong denda telat sebanyak 60 menit
+        if ($isIdt) {
+            $lateMinutes = max(0, $lateMinutes - 60);
+        }
+
+        // Jika ada izin IPC, potong denda pulang cepat sebanyak 60 menit
+        if ($isIpc) {
+            $earlyLeaveMinutes = max(0, $earlyLeaveMinutes - 60);
         }
 
         $shortWorkMinutes = max(0, $requiredWorkMinutes - $workMinutes);
 
         /*
         |--------------------------------------------------------------------------
-        | IDT / IPC Identification
-        |--------------------------------------------------------------------------
-        */
-        $isIdt = false;
-        $isIpc = false;
-        if ($leaveRequest) {
-            $code = $leaveRequest->leaveType?->code;
-            $isIdt = $code === 'I-IDT';
-            $isIpc = $code === 'I-IPC';
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | ATURAN BARU: Penentuan Status & Identitas is_wfa
+        | 11. Penentuan Status & Identitas WFA
         |--------------------------------------------------------------------------
         */
         $apakahWeekendAtauLibur = $isHariLiburAtauWeekend || $date->isSunday();
@@ -356,6 +402,11 @@ class AttendanceProcessorService
         if ($apakahWeekendAtauLibur) {
             $status = 'wfa';
             $isWfa = true;
+
+            // ATURAN WFA: Fleksibel. Hapus sanksi keterlambatan dan pulang cepat.
+            $lateMinutes = 0;
+            $earlyLeaveMinutes = 0;
+
         } else {
             $status = 'present';
             $isWfa = false;
@@ -382,10 +433,10 @@ class AttendanceProcessorService
                 'forgot_check_out' => $forgotCheckOut,
                 'is_idt' => $isIdt,
                 'is_ipc' => $isIpc,
-                'is_wfa' => $isWfa, // Menyimpan identitas is_wfa ke database
+                'is_wfa' => $isWfa,
                 'leave_request_id' => $leaveRequest?->id,
                 'leave_type_id' => $leaveRequest?->leave_type_id,
-                'status' => $status, // Berisi 'wfa' jika masuk di hari libur/weekend, atau 'present' di hari kerja biasa
+                'status' => $status,
                 'source' => $log->source,
                 'notes' => $log->notes,
                 'processed_at' => now()
