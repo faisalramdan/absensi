@@ -336,25 +336,67 @@
                                             <td><span
                                                     class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1 fw-medium">{{ $attendance->actual_check_out ? date('H:i', strtotime($attendance->actual_check_out)) : '--:--' }}</span>
                                             </td>
-                                            <td><span
+                                            <td>
+                                                <span
                                                     class="{{ $attendance->late_minutes > 0 ? 'text-danger fw-semibold' : 'text-muted' }}">{{ $attendance->late_minutes ?? 0 }}
-                                                    mnt</span></td>
+                                                    mnt</span>
+                                                @if($attendance->is_idt === true || $attendance->is_idt === 't' || $attendance->is_idt == 1)
+                                                    <div class="mt-1">
+                                                        <span
+                                                            class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1 fw-medium">
+                                                            I-IDT
+                                                        </span>
+                                                    </div>
+                                                @endif
+                                            </td>
+
                                             <td><span
                                                     class="{{ $attendance->early_leave_minutes > 0 ? 'text-warning fw-semibold' : 'text-muted' }}">{{ $attendance->early_leave_minutes ?? 0 }}
-                                                    mnt</span></td>
+                                                    mnt</span>
+                                                @if($attendance->is_ipc === true || $attendance->is_ipc === 't' || $attendance->is_ipc == 1)
+                                                    <div class="mt-1">
+                                                        <span
+                                                            class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1 fw-medium">
+                                                            I-IPC
+                                                        </span>
+                                                    </div>
+                                                @endif
+                                            </td>
                                             <td>
-                                                <span class="fw-medium text-dark">
-                                                    @if($attendance->work_minutes) {{ floor($attendance->work_minutes / 60) }}j
-                                                    {{ $attendance->work_minutes % 60 }}m @else - @endif
-                                                </span>
+                                                <div class="d-flex flex-column">
+                                                    <span class="fw-medium text-dark">
+                                                        @if($attendance->work_minutes)
+                                                            {{ floor($attendance->work_minutes / 60) }}
+                                                            Jam
+                                                            {{ $attendance->work_minutes % 60 }} Menit
+                                                        @else
+                                                            -
+                                                        @endif
+                                                    </span>
+                                                    @if($attendance->status !== 'wfa' && $attendance->status !== 'holiday' && $attendance->status !== 'off')
+                                                        @if($attendance->short_work_minutes && $attendance->short_work_minutes > 0)
+                                                            <small class="text-danger fw-bold mt-1">
+                                                                (- {{ floor($attendance->short_work_minutes / 60) }} Jam
+                                                                {{ $attendance->short_work_minutes % 60 }} Menit)
+                                                            </small>
+                                                        @endif
+                                                    @endif
+                                                </div>
                                             </td>
                                             <td>
                                                 @php
                                                     $statusStyles = ['present' => 'bg-success-subtle text-success border-success-subtle', 'alpha' => 'bg-danger-subtle text-danger border-danger-subtle', 'leave' => 'bg-warning-subtle text-warning border-warning-subtle', 'holiday' => 'bg-info-subtle text-info border-info-subtle', 'off' => 'bg-light text-secondary border'];
-                                                    $class = $statusStyles[strtolower($attendance->status)] ?? 'bg-light text-dark';
+                                                    $currentStatus = strtolower($attendance->status);
+                                                    $class = $statusStyles[$currentStatus] ?? 'bg-light text-dark';
                                                 @endphp
                                                 <span
                                                     class="badge {{ $class }} border px-2 py-1 fw-semibold">{{ strtoupper($attendance->status) }}</span>
+
+                                                @if($currentStatus === 'leave' && $attendance->leaveType)
+                                                    <div class="small text-muted fw-bold mt-1" style="font-size: 0.75rem;">
+                                                        ({{ $attendance->leaveType->code }})
+                                                    </div>
+                                                @endif
                                             </td>
                                         </tr>
                                     @empty
