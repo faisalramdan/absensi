@@ -319,8 +319,17 @@ class AttendanceProcessorService
             }
         }
 
-        $forgotCheckIn = empty($log->check_in);
-        $forgotCheckOut = empty($log->check_out);
+        // Tentukan dulu apakah hari ini libur atau weekend
+        $apakahWeekendAtauLibur = $isHariLiburAtauWeekend || $date->isSunday();
+
+        // Jika hari libur / weekend, jangan pernah anggap lupa check-in / check-out
+        if ($apakahWeekendAtauLibur) {
+            $forgotCheckIn = false;
+            $forgotCheckOut = false;
+        } else {
+            $forgotCheckIn = empty($log->check_in);
+            $forgotCheckOut = empty($log->check_out);
+        }
 
         /*
         |--------------------------------------------------------------------------
