@@ -135,22 +135,34 @@ class AttendanceMonthlyController extends Controller
 
                     // ATURAN LATE: Menit > 0 dan kolom toleransi (is_idt) TIDAK bernilai true/1
                     'late' => $items->filter(function ($row) {
-                        return $row->late_minutes > 0 && $row->is_idt != true;
+                        $isIdt = filter_var($row->is_idt, FILTER_VALIDATE_BOOLEAN);
+                        $isKhs = filter_var($row->is_khs ?? false, FILTER_VALIDATE_BOOLEAN); // 👈 Tambahan cek is_khs
+        
+                        return $row->late_minutes > 0 && !$isIdt && !$isKhs;
                     })->count(),
 
-                    // ATURAN MENIT LATE: Hanya menjumlahkan menit yang tidak terkena toleransi is_idt
+                    // ATURAN MENIT LATE: Hanya menjumlahkan menit yang tidak terkena toleransi is_idt & is_khs
                     'late_minutes' => $items->filter(function ($row) {
-                        return $row->is_idt != true;
+                        $isIdt = filter_var($row->is_idt, FILTER_VALIDATE_BOOLEAN);
+                        $isKhs = filter_var($row->is_khs ?? false, FILTER_VALIDATE_BOOLEAN); // 👈 Tambahan cek is_khs
+        
+                        return !$isIdt && !$isKhs;
                     })->sum('late_minutes'),
 
                     // ATURAN EARLY LEAVE: Menit > 0 dan kolom toleransi (is_ipc) TIDAK bernilai true/1
                     'early_leave' => $items->filter(function ($row) {
-                        return $row->early_leave_minutes > 0 && $row->is_ipc != true;
+                        $isIpc = filter_var($row->is_ipc, FILTER_VALIDATE_BOOLEAN);
+                        $isKhs = filter_var($row->is_khs ?? false, FILTER_VALIDATE_BOOLEAN); // 👈 Tambahan cek is_khs
+        
+                        return $row->early_leave_minutes > 0 && !$isIpc && !$isKhs;
                     })->count(),
 
-                    // ATURAN MENIT EARLY LEAVE: Hanya menjumlahkan menit yang tidak terkena toleransi is_ipc
+                    // ATURAN MENIT EARLY LEAVE: Hanya menjumlahkan menit yang tidak terkena toleransi is_ipc & is_khs
                     'early_leave_minutes' => $items->filter(function ($row) {
-                        return $row->is_ipc != true;
+                        $isIpc = filter_var($row->is_ipc, FILTER_VALIDATE_BOOLEAN);
+                        $isKhs = filter_var($row->is_khs ?? false, FILTER_VALIDATE_BOOLEAN); // 👈 Tambahan cek is_khs
+        
+                        return !$isIpc && !$isKhs;
                     })->sum('early_leave_minutes'),
 
                     // Menghitung kasus Lupa Absen Masuk & Keluar
