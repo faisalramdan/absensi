@@ -213,10 +213,13 @@ class AttendanceProcessorService
         */
         $isIdt = false;
         $isIpc = false;
+        $isKhs = false; // <-- Tambahan untuk Izin Khusus
+
         if ($leaveRequest) {
             $code = $leaveRequest->leaveType?->code;
             $isIdt = $code === 'I-IDT';
             $isIpc = $code === 'I-IPC';
+            $isKhs = $code === 'I-KHS'; // <-- Menangkap kode Izin Khusus
         }
 
         /*
@@ -401,6 +404,17 @@ class AttendanceProcessorService
 
         $shortWorkMinutes = max(0, $requiredWorkMinutes - $workMinutes);
 
+        // --- TAMBAHAN KODE UNTUK IZIN KHUSUS (I-KHS) ---
+        // Jika karyawan memiliki izin khusus (I-KHS), maka kurang jam kerja mutlak di-nol-kan (putih)
+        if ($isKhs) {
+            $shortWorkMinutes = 0;
+
+            // Opsional: Jika aturan perusahaan juga ingin memutihkan sanksi telat / pulang cepat 
+            // akibat penugasan khusus dari atasan tersebut, Anda bisa mengaktifkan baris di bawah ini:
+            // $lateMinutes = 0;
+            // $earlyLeaveMinutes = 0;
+        }
+
         /*
         |--------------------------------------------------------------------------
         | 11. Penentuan Status & Identitas WFA
@@ -443,6 +457,7 @@ class AttendanceProcessorService
                 'is_idt' => $isIdt,
                 'is_ipc' => $isIpc,
                 'is_wfa' => $isWfa,
+                'is_khs' => $isKhs,
                 'leave_request_id' => $leaveRequest?->id,
                 'leave_type_id' => $leaveRequest?->leave_type_id,
                 'status' => $status,

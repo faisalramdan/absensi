@@ -146,23 +146,40 @@ class AttendanceController extends Controller
                 ->where('status', 'alpha')
                 ->count(),
 
-            // Menghitung total keterlambatan
+            // Menghitung total keterlambatan (Abaikan jika is_khs true)
             'late' => (clone $query)
                 ->where('late_minutes', '>', 0)
                 ->where(function ($q) {
-                    $q->where('is_idt', '!=', true)
-                        ->orWhereNull('is_idt');
+                    $q->where('is_idt', '!=', true)->orWhereNull('is_idt');
+                })
+                ->where(function ($q) {
+                    $q->where('is_khs', '!=', true)->orWhereNull('is_khs');
                 })
                 ->count(),
 
-            // Menghitung total pulang cepat
+            // Menghitung total pulang cepat (Abaikan jika is_khs true)
             'early_leave' => (clone $query)
                 ->where('early_leave_minutes', '>', 0)
                 ->where(function ($q) {
-                    $q->where('is_ipc', '!=', true)
-                        ->orWhereNull('is_ipc');
+                    $q->where('is_ipc', '!=', true)->orWhereNull('is_ipc');
+                })
+                ->where(function ($q) {
+                    $q->where('is_khs', '!=', true)->orWhereNull('is_khs');
                 })
                 ->count(),
+
+            // ... (kode lainnya seperti forgot_check_in, holiday, off, dll biarkan saja) ...
+
+            // Menghitung total akumulasi menit keterlambatan (Abaikan jika is_khs true)
+            'total_late_minutes' => (clone $query)
+                ->where('late_minutes', '>', 0)
+                ->where(function ($q) {
+                    $q->where('is_idt', '!=', true)->orWhereNull('is_idt');
+                })
+                ->where(function ($q) {
+                    $q->where('is_khs', '!=', true)->orWhereNull('is_khs');
+                })
+                ->sum('late_minutes'),
 
             // Menghitung total lupa melakukan absen masuk
             'forgot_check_in' => (clone $query)
@@ -199,14 +216,6 @@ class AttendanceController extends Controller
                 ->where('is_idt', true)
                 ->count(),
 
-            // Menghitung total akumulasi menit keterlambatan
-            'total_late_minutes' => (clone $query)
-                ->where('late_minutes', '>', 0)
-                ->where(function ($q) {
-                    $q->where('is_idt', '!=', true)
-                        ->orWhereNull('is_idt');
-                })
-                ->sum('late_minutes'),
 
             // Menghitung berapa kali karyawan kurang jam kerja
             'short_work_count' => (clone $query)
@@ -242,11 +251,14 @@ class AttendanceController extends Controller
         $summary['late_hours'] = floor($summary['total_late_minutes'] / 60);
         $summary['late_minutes_remainder'] = $summary['total_late_minutes'] % 60;
 
+        // Tambahkan pengecekan is_khs di sini
         $summary['total_early_leave_minutes'] = (clone $query)
             ->where('early_leave_minutes', '>', 0)
             ->where(function ($q) {
-                $q->where('is_ipc', '!=', true)
-                    ->orWhereNull('is_ipc');
+                $q->where('is_ipc', '!=', true)->orWhereNull('is_ipc');
+            })
+            ->where(function ($q) {
+                $q->where('is_khs', '!=', true)->orWhereNull('is_khs');
             })
             ->sum('early_leave_minutes');
 

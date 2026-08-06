@@ -33,6 +33,7 @@ class Attendance extends Model
 
         'is_idt',
         'is_ipc',
+        'is_khs',
 
         'forgot_check_in',
         'forgot_check_out',

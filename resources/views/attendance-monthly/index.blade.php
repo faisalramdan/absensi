@@ -307,12 +307,11 @@
                                         <th class="text-center sticky-col-1" width="50">No</th>
                                         <th class="sticky-col-2">Nama Karyawan / NIK</th>
                                         <th class="text-center">Present</th>
-
                                         <th class="text-center">Sakit</th>
                                         <th class="text-center">Izin</th>
                                         <th class="text-center">Alpha</th>
                                         <th class="text-center">Cuti</th>
-                                        <th class="text-center" style="background-color: #f0f7ff;">WFA</th>
+                                        <th class="text-center" style="background-color: #f0f7ff;">WFA (Off Day)</th>
                                         <th class="text-center">Late</th>
                                         <th class="text-center">IDT</th>
                                         <th class="text-center">Forgot In</th>
@@ -407,6 +406,7 @@
     @push('scripts')
         <script>
             document.addEventListener('DOMContentLoaded', function () {
+                // --- 1. FITUR FILTER KARYAWAN BERDASARKAN PERUSAHAAN ---
                 const companySelect = document.querySelector('select[name="company_id"]');
                 const employeeSelect = document.querySelector('select[name="employee_id"]');
 
@@ -451,10 +451,54 @@
                     // Jalankan fungsi saat dropdown perusahaan diubah
                     companySelect.addEventListener('change', filterEmployees);
 
-                    // Jalankan sekali saat halaman dimuat (jaga-jaga jika halaman direload dengan kondisi perusahaan terpilih)
+                    // Jalankan sekali saat halaman dimuat
                     if (companySelect.value) {
                         filterEmployees();
                     }
+                }
+
+
+                // --- 2. FITUR AUTO-UPDATE TANGGAL START & END BERDASARKAN BULAN/TAHUN ---
+                const monthSelect = document.querySelector('select[name="month"]');
+                const yearSelect = document.querySelector('select[name="year"]');
+                const startDateInput = document.querySelector('input[name="start_date"]');
+                const endDateInput = document.querySelector('input[name="end_date"]');
+
+                if (monthSelect && yearSelect && startDateInput && endDateInput) {
+                    function updateDateRange() {
+                        const year = parseInt(yearSelect.value);
+                        const month = parseInt(monthSelect.value);
+
+                        if (!isNaN(year) && !isNaN(month)) {
+                            // Contoh Logika Cut-off: Tanggal 26 bulan sebelumnya s/d Tanggal 25 bulan terpilih
+                            // Tanggal End: Tanggal 25 bulan yang dipilih
+                            let endDate = new Date(year, month - 1, 25);
+
+                            // Tanggal Start: Tanggal 26 bulan sebelumnya
+                            let startDate = new Date(year, month - 2, 26);
+
+                            // Helper untuk mengubah format Date menjadi string 'YYYY-MM-DD'
+                            function formatDate(dateObj) {
+                                let d = new Date(dateObj),
+                                    m = '' + (d.getMonth() + 1),
+                                    day = '' + d.getDate(),
+                                    year = d.getFullYear();
+
+                                if (m.length < 2) m = '0' + m;
+                                if (day.length < 2) day = '0' + day;
+
+                                return [year, m, day].join('-');
+                            }
+
+                            // Masukkan nilai otomatis ke dalam input type="date"
+                            startDateInput.value = formatDate(startDate);
+                            endDateInput.value = formatDate(endDate);
+                        }
+                    }
+
+                    // Jalankan saat dropdown bulan atau tahun diubah
+                    monthSelect.addEventListener('change', updateDateRange);
+                    yearSelect.addEventListener('change', updateDateRange);
                 }
             });
         </script>

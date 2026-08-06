@@ -395,16 +395,30 @@
                                                     ];
                                                     $currentStatus = strtolower($attendance->status);
                                                     $class = $statusStyles[$currentStatus] ?? 'bg-light text-dark';
+                                                    
+                                                    // PERBAIKAN: Pokoknya, jika datanya punya kode I-KHS, paksa true tanpa peduli status aslinya
+                                                    $isIzinKhusus = (!empty($attendance->leaveType) && $attendance->leaveType->code === 'I-KHS');
                                                 @endphp
 
-                                                <span class="badge {{ $class }} px-2 py-1 fw-semibold">
-                                                    {{ strtoupper($attendance->status) }}
-                                                </span>
-
-                                                @if($currentStatus === 'leave' && $attendance->leaveType)
+                                                @if($isIzinKhusus)
+                                                    {{-- JIKA I-KHS: Paksa tampilkan sebagai PRESENT beserta kode I-KHS --}}
+                                                    <span class="badge {{ $statusStyles['present'] }} px-2 py-1 fw-semibold">
+                                                        PRESENT
+                                                    </span>
                                                     <div class="small text-muted fw-bold mt-1" style="font-size: 0.75rem;">
-                                                        ({{ $attendance->leaveType->code }})
+                                                        (I-KHS)
                                                     </div>
+                                                @else
+                                                    {{-- JIKA NORMAL: Tampilkan sesuai status aslinya dari database --}}
+                                                    <span class="badge {{ $class }} px-2 py-1 fw-semibold">
+                                                        {{ strtoupper($attendance->status) }}
+                                                    </span>
+
+                                                    @if($currentStatus === 'leave' && $attendance->leaveType)
+                                                        <div class="small text-muted fw-bold mt-1" style="font-size: 0.75rem;">
+                                                            ({{ $attendance->leaveType->code }})
+                                                        </div>
+                                                    @endif
                                                 @endif
                                             </td>
                                             <td class="text-center">
