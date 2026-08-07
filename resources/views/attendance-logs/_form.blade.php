@@ -1,17 +1,30 @@
 <div class="row">
+    {{-- Cek apakah ini mode Edit (jika $attendanceLog ada) --}}
+    @php
+        $isEdit = isset($attendanceLog);
+        // Tentukan default company_id: prioritaskan dari attendanceLog->employee->company_id, lalu old(), lalu defaultCompanyId
+        $selectedCompanyId = old('company_id', $isEdit ? ($attendanceLog->employee->company_id ?? '') : ($defaultCompanyId ?? ''));
+        $selectedEmployeeId = old('employee_id', $isEdit ? $attendanceLog->employee_id : '');
+    @endphp
+
     {{-- 1. Pilihan Perusahaan (Company) --}}
     <div class="col-md-6 mb-3">
         <label class="form-label">
             Perusahaan <span class="text-danger">*</span>
         </label>
-        <select name="company_id" id="company_id" class="form-control" required>
+        <select name="company_id" id="company_id" class="form-control" {{ $isEdit ? 'disabled' : 'required' }}>
             <option value="">-- Pilih Perusahaan --</option>
             @foreach($companies as $company)
-                <option value="{{ $company->id }}" {{ (old('company_id', $defaultCompanyId ?? '') == $company->id) ? 'selected' : '' }}>
+                <option value="{{ $company->id }}" {{ ($selectedCompanyId == $company->id) ? 'selected' : '' }}>
                     {{ $company->name }}
                 </option>
             @endforeach
         </select>
+
+        {{-- Input hidden agar nilai company_id tetap terkirim saat edit --}}
+        @if($isEdit)
+            <input type="hidden" name="company_id" value="{{ $selectedCompanyId }}">
+        @endif
     </div>
 
     {{-- 2. Pilihan Karyawan (Tersaring Berdasarkan Perusahaan) --}}
@@ -19,14 +32,19 @@
         <label class="form-label">
             Karyawan <span class="text-danger">*</span>
         </label>
-        <select name="employee_id" id="employee_id" class="form-control" required>
+        <select name="employee_id" id="employee_id" class="form-control" {{ $isEdit ? 'disabled' : 'required' }}>
             <option value="">-- Pilih Karyawan --</option>
             @foreach($employees as $employee)
-                <option value="{{ $employee->id }}" data-company-id="{{ $employee->company_id }}" {{ (old('employee_id', $attendanceLog->employee_id ?? '') == $employee->id) ? 'selected' : '' }}>
+                <option value="{{ $employee->id }}" data-company-id="{{ $employee->company_id }}" {{ ($selectedEmployeeId == $employee->id) ? 'selected' : '' }}>
                     {{ $employee->nik }} - {{ $employee->full_name }}
                 </option>
             @endforeach
         </select>
+
+        {{-- Input hidden agar nilai employee_id tetap terkirim saat edit --}}
+        @if($isEdit)
+            <input type="hidden" name="employee_id" value="{{ $selectedEmployeeId }}">
+        @endif
     </div>
 </div>
 
@@ -86,7 +104,7 @@
                 companyId: option.getAttribute("data-company-id")
             }));
 
-            const oldEmployeeSelected = "{{ old('employee_id', $attendanceLog->employee_id ?? '') }}";
+            const oldEmployeeSelected = "{{ $selectedEmployeeId }}";
 
             function filterEmployees() {
                 const selectedCompany = companySelect.value;
@@ -118,14 +136,13 @@
                 });
             }
 
-            // Jalankan saat perusahaan diubah manual oleh user
+            // Jalankan saat perusahaan diubah manual oleh user (hanya aktif di mode create)
             companySelect.addEventListener("change", function () {
-                // Reset pilihan karyawan jika perusahaan diganti
                 employeeSelect.value = "";
                 filterEmployees();
             });
 
-            // Jalankan saat pertama kali halaman dimuat (untuk menyesuaikan default login / old value)
+            // Jalankan saat pertama kali halaman dimuat
             filterEmployees();
         }
     });

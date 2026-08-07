@@ -119,7 +119,7 @@
 
                                             <label class="form-label">
 
-                                                Bulan Payroll
+                                                Bulan Absensi
 
                                             </label>
 
@@ -312,11 +312,11 @@
             btn.disabled = true;
 
             btn.innerHTML = `
-                        <span class="spinner-border spinner-border-sm me-1"
-                              role="status"
-                              aria-hidden="true"></span>
-                        Processing Attendance...
-                    `;
+                            <span class="spinner-border spinner-border-sm me-1"
+                                  role="status"
+                                  aria-hidden="true"></span>
+                            Processing Attendance...
+                        `;
 
         });
 

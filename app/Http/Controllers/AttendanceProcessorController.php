@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use App\Models\Employee;
 use App\Models\Attendance;
+use App\Helpers\ActivityLogger;
 
 class AttendanceProcessorController extends Controller
 {
@@ -55,6 +56,20 @@ class AttendanceProcessorController extends Controller
             'date',
             [$start, $end]
         )->count();
+
+        ActivityLogger::log(
+            'Attendance',          // Nama Modul
+            'Generate',            // Jenis Aksi
+            'Melakukan generate absensi periode: ' . $start->format('d M Y') . ' s/d ' . $end->format('d M Y'), // Pesan Log disesuaikan
+            [],                    // Data lama
+            [
+                'period_start' => $start->format('Y-m-d'),
+                'period_end' => $end->format('Y-m-d'),
+                'month' => $request->month,
+                'year' => $request->year,
+                'generated_by' => auth()->user()->name
+            ]
+        );
 
         return back()->with([
             'success' => 'Attendance berhasil diproses.',
