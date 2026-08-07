@@ -43,12 +43,13 @@
                                         <div class="col-lg-6">
                                          
                                                 <div class="mb-3">
-                                                    <label for="nik" class="form-label fw-semibold">
-                                                        NIK (Nomor Induk Karyawan) & ID Fingerprint
+                                                    <label for="full_name" class="form-label fw-semibold">
+                                                        Nama Lengkap
                                                         <span class="text-danger">*</span>
                                                     </label>
-                                                    <input type="text" name="nik" class="form-control" value="{{ old('nik', $employee->nik) }}"
-                                                        placeholder="Masukkan NIK" required>
+                                                    <input type="text" name="full_name" class="form-control"
+                                                        value="{{ old('full_name', $employee->full_name) }}" placeholder="Masukkan Nama Lengkap"
+                                                        required>
                                                 </div>
                                                 <div class="mb-3">
                                                     <label for="email" class="form-label fw-semibold">
@@ -62,15 +63,7 @@
                                         </div>
                                         <div class="col-lg-6">
                                            
-                                                <div class="mb-3">
-                                                    <label for="full_name" class="form-label fw-semibold">
-                                                        Nama Lengkap
-                                                        <span class="text-danger">*</span>
-                                                    </label>
-                                                    <input type="text" name="full_name" class="form-control"
-                                                        value="{{ old('full_name', $employee->full_name) }}" placeholder="Masukkan Nama Lengkap"
-                                                        required>
-                                                </div>
+                                                
                                                 <div class="mb-3">
                                                     <label for="phone" class="form-label fw-semibold">
                                                         No HP
@@ -79,9 +72,6 @@
 
                                                     <input type="text" name="phone" class="form-control" value="{{ old('phone', $employee->phone) }}" placeholder="Masukkan No HP" required>
                                                 </div>
-                                        </div>
-                                        <div class="col-lg-6">
-                                    
                                                 <div class="mb-3">
                                                     <label for="gender" class="form-label fw-semibold">
                                                         Jenis Kelamin
@@ -100,8 +90,8 @@
                                                         </option>
                                                     </select>
                                                 </div>
-                                        
                                         </div>
+                                        
                                     </div>
                                 </div>
                             </div>
@@ -282,6 +272,15 @@
 
                                                     <input type="date" name="join_date" class="form-control"
                                                         value="{{ old('join_date', $employee->join_date) }}">
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <label for="nik" class="form-label fw-semibold">
+                                                        NIK (Nomor Induk Karyawan) & ID Fingerprint
+                                                        <span class="text-danger">*</span>
+                                                    </label>
+                                                    <input type="text" name="nik" class="form-control" value="{{ old('nik', $employee->nik) }}"
+                                                        placeholder="Masukkan NIK" readonly required>
                                                 </div>
                                         </div>
                                         <div class="col-lg-6">

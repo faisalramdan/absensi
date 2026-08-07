@@ -13,6 +13,7 @@ use Spatie\Permission\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use App\Helpers\ActivityLogger;
+use Carbon\Carbon;
 
 class EmployeeController extends Controller
 {
@@ -403,5 +404,61 @@ class EmployeeController extends Controller
             'employees.show',
             compact('employee')
         );
+    }
+
+    public function generateNik(Request $request)
+    {
+        $companyId = $request->query('company_id');
+        $joinDate = $request->query('join_date');
+
+        if (!$companyId || !$joinDate) {
+            return response()->json(['error' => 'Data tidak lengkap'], 400);
+        }
+
+        // 1. Ambil Data Perusahaan berdasarkan ID
+        $company = Company::find($companyId);
+
+        if (!$company) {
+            return response()->json(['error' => 'Perusahaan tidak valid'], 404);
+        }
+
+        // 2. Kode Perusahaan (Ambil dari kolom 'code')
+        $companyCode = str_pad($company->code, 2, '0', STR_PAD_LEFT);
+
+        // 3. Tahun dan Bulan Join Date
+        $date = Carbon::parse($joinDate);
+        $year = $date->format('y'); // 2 digit tahun (contoh: 25)
+        $month = $date->format('m'); // 2 digit bulan (contoh: 11)
+
+        // 4. MENCARI URUTAN NIK TERBESAR (Anti-Duplicate)
+        // Ambil HANYA kolom nik dari karyawan di perusahaan terpilih agar performa sangat cepat
+        $existingNiks = Employee::where('company_id', $companyId)
+            ->whereNotNull('nik')
+            ->where('nik', '!=', '')
+            // ->withTrashed() // HILANGKAN TANDA // DI AWAL BARIS INI JIKA TABEL EMPLOYEE MENGGUNAKAN SOFT DELETES
+            ->pluck('nik');
+
+        $maxSequence = 0;
+
+        foreach ($existingNiks as $existingNik) {
+            // Ambil 3 digit karakter paling belakang dari masing-masing NIK, lalu jadikan angka (integer)
+            $sequence = (int) substr($existingNik, -3);
+
+            // Cari angka yang paling besar
+            if ($sequence > $maxSequence) {
+                $maxSequence = $sequence;
+            }
+        }
+
+        // Tambahkan 1 dari angka terbesar yang ditemukan (jika max 5, maka jadi 6)
+        $sequenceNumber = $maxSequence + 1;
+
+        // Format kembali urutan menjadi 3 digit (misal: 6 menjadi 006)
+        $sequenceCode = str_pad($sequenceNumber, 3, '0', STR_PAD_LEFT);
+
+        // 5. Gabungkan semua komponen menjadi NIK
+        $nik = $companyCode . $year . $month . $sequenceCode;
+
+        return response()->json(['nik' => $nik]);
     }
 }

@@ -86,6 +86,8 @@ Route::middleware('auth')->group(function () {
         Route::resource('employees', EmployeeController::class);
     });
 
+    Route::get('/api/generate-nik', [EmployeeController::class, 'generateNik'])->name('generate.nik');
+
     // --- FITUR ABSENSI: MASTER SHIFT ---
     Route::resource('shifts', ShiftController::class);
     Route::get('/assignments/available-employees', [ShiftAssignmentController::class, 'getAvailableEmployees'])->name('assignments.available-employees');

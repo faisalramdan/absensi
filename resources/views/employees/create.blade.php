@@ -38,15 +38,16 @@
                                 <div class="card-body">
                                     <div class="row">
                                         <div class="col-lg-6">
-
                                             <div class="mb-3">
-                                                <label for="nik" class="form-label fw-semibold">
-                                                    NIK (Nomor Induk Karyawan) & ID Fingerprint
+                                                <label for="full_name" class="form-label fw-semibold">
+                                                    Nama Lengkap
                                                     <span class="text-danger">*</span>
                                                 </label>
-                                                <input type="text" name="nik" class="form-control" value="{{ old('nik') }}"
-                                                    placeholder="Masukkan NIK" required>
+                                                <input type="text" name="full_name" class="form-control"
+                                                    value="{{ old('full_name') }}" placeholder="Masukkan Nama Lengkap"
+                                                    required>
                                             </div>
+
                                             <div class="mb-3">
                                                 <label for="email" class="form-label fw-semibold">
                                                     Email
@@ -59,15 +60,7 @@
                                         </div>
                                         <div class="col-lg-6">
 
-                                            <div class="mb-3">
-                                                <label for="full_name" class="form-label fw-semibold">
-                                                    Nama Lengkap
-                                                    <span class="text-danger">*</span>
-                                                </label>
-                                                <input type="text" name="full_name" class="form-control"
-                                                    value="{{ old('full_name') }}" placeholder="Masukkan Nama Lengkap"
-                                                    required>
-                                            </div>
+
                                             <div class="mb-3">
                                                 <label for="phone" class="form-label fw-semibold">
                                                     No HP
@@ -77,8 +70,6 @@
                                                 <input type="text" name="phone" class="form-control"
                                                     value="{{ old('phone') }}" placeholder="Masukkan No HP" required>
                                             </div>
-                                        </div>
-                                        <div class="col-lg-6">
 
                                             <div class="mb-3">
                                                 <label for="gender" class="form-label fw-semibold">
@@ -94,8 +85,8 @@
                                                         Perempuan</option>
                                                 </select>
                                             </div>
-
                                         </div>
+
                                     </div>
                                 </div>
                             </div>
@@ -232,7 +223,7 @@
                                                     <span class="text-danger">*</span>
                                                 </label>
 
-                                                <select name="company_id" class="form-select" required>
+                                                <select name="company_id" id="company_id" class="form-select" required>
 
                                                     <option value="" selected disabled>
                                                         Silakan Pilih
@@ -257,8 +248,16 @@
                                                     Tanggal Bergabung <span class="text-danger">*</span>
                                                 </label>
 
-                                                <input type="date" name="join_date" class="form-control"
+                                                <input type="date" name="join_date" id="join_date" class="form-control"
                                                     value="{{ old('join_date') }}">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="nik" class="form-label fw-semibold">
+                                                    NIK (Nomor Induk Karyawan) & ID Fingerprint
+                                                    <span class="text-danger">*</span>
+                                                </label>
+                                                <input type="text" name="nik" id="nik"class="form-control" value="{{ old('nik') }}"
+                                                    placeholder="Masukkan NIK" readonly required>
                                             </div>
                                         </div>
                                         <div class="col-lg-6">
@@ -446,65 +445,97 @@
     <!-- END Wrapper -->
 
     <script>
-        document.querySelector('.add-contact').addEventListener('click', function () {
-            let html = `
-                                <div class="row emergency-item mt-2">
+    document.addEventListener('DOMContentLoaded', function () {
+        
+        // --- 1. SCRIPT KONTAK DARURAT ---
+        const maxContacts = 3; // Batas maksimal kontak darurat
+        const emergencyContainer = document.getElementById('emergency-container');
+        const btnAddContact = document.querySelector('.add-contact');
 
-                                    <div class="col-md-4">
-                                        <input type="text"
-                                            name="emergency_name[]"
-                                            class="form-control" placeholder="Nama Kontak">
-                                    </div>
+        if (btnAddContact && emergencyContainer) {
+            btnAddContact.addEventListener('click', function () {
+                // Hitung jumlah kontak saat ini
+                let currentContacts = emergencyContainer.querySelectorAll('.emergency-item').length;
 
-                                    <div class="col-md-3">
+                if (currentContacts >= maxContacts) {
+                    alert(`Anda hanya dapat menambahkan maksimal ${maxContacts} kontak darurat.`);
+                    return;
+                }
 
-                                        <select
-                                            name="emergency_relationship[]"
-                                            class="form-select">
+                let html = `
+                    <div class="row emergency-item mt-2">
+                        <div class="col-md-4">
+                            <input type="text" name="emergency_name[]" class="form-control" placeholder="Nama Kontak" required>
+                        </div>
+                        <div class="col-md-3">
+                            <select name="emergency_relationship[]" class="form-select" required>
+                                <option value="" selected disabled>Pilih</option>
+                                <option>Suami</option>
+                                <option>Istri</option>
+                                <option>Ayah</option>
+                                <option>Ibu</option>
+                                <option>Anak</option>
+                                <option>Kakak</option>
+                                <option>Adik</option>
+                                <option>Paman</option>
+                                <option>Bibi</option>
+                                <option>Saudara</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <input type="text" name="emergency_phone[]" class="form-control phone-input" placeholder="No HP" required oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                        </div>
+                        <div class="col-md-1">
+                            <button type="button" class="btn btn-danger remove-contact">
+                                <i class="ti ti-minus">-</i>
+                            </button>
+                        </div>
+                    </div>`;
 
-                                            <option value="">Pilih</option>
-                                            <option>Suami</option>
-                                            <option>Istri</option>
-                                            <option>Ayah</option>
-                                            <option>Ibu</option>
-                                            <option>Anak</option>
-                                            <option>Kakak</option>
-                                            <option>Adik</option>
-                                            <option>Paman</option>
-                                            <option>Bibi</option>
-                                            <option>Saudara</option>
+                emergencyContainer.insertAdjacentHTML('beforeend', html);
+            });
+        }
 
-                                        </select>
-
-                                    </div>
-
-                                    <div class="col-md-4">
-
-                                        <input
-                                            type="text"
-                                            name="emergency_phone[]"
-                                            class="form-control" placeholder="No HP">
-
-                                    </div>
-
-                                    <div class="col-md-1">
-                                        <button type="button" class="btn btn-danger remove-contact">
-                                            -
-                                        </button>
-                                    </div>
-                            </div>`;
-
-            document
-                .getElementById('emergency-container')
-                .insertAdjacentHTML('beforeend', html);
-
-        });
-
+        // Event listener untuk tombol hapus kontak
         document.addEventListener('click', function (e) {
-            if (e.target.classList.contains('remove-contact')) {
+            if (e.target.classList.contains('remove-contact') || e.target.closest('.remove-contact')) {
                 e.target.closest('.emergency-item').remove();
             }
         });
 
-    </script>
+
+        // --- 2. SCRIPT NIK OTOMATIS (Dari jawaban sebelumnya) ---
+        const companySelect = document.getElementById('company_id');
+        const joinDateInput = document.getElementById('join_date');
+        const nikInput = document.getElementById('nik');
+
+        if(companySelect && joinDateInput && nikInput) {
+            companySelect.addEventListener('change', fetchNik);
+            joinDateInput.addEventListener('change', fetchNik);
+
+            function fetchNik() {
+                const companyId = companySelect.value;
+                const joinDate = joinDateInput.value;
+
+                if (companyId && joinDate) {
+                    nikInput.value = 'Memproses...'; 
+                    fetch(`/api/generate-nik?company_id=${companyId}&join_date=${joinDate}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.nik) {
+                                nikInput.value = data.nik;
+                            } else {
+                                nikInput.value = '';
+                                alert('Gagal mengenerate NIK');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            nikInput.value = '';
+                        });
+                }
+            }
+        }
+    });
+</script>
 @endsection
