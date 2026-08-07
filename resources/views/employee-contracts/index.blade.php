@@ -117,7 +117,7 @@
                         <div class="card">
                             <div class="d-flex card-header justify-content-between align-items-center">
                                 <div>
-                                    <h4 class="card-title">Semua Daftar Kontrak Karyawan</h4>
+                                    <h4 class="card-title">Semua Daftar Kontrak Karyawan & Alokasi Cuti/Izin</h4>
                                     <p class="text-muted mb-0">{{ $contracts->total() }} Kontrak yang ditemukan di sistem
                                         Anda
                                     </p>
@@ -205,7 +205,7 @@
                                                             @can('employee-contract.show')
                                                                 <a href="{{ route('employee-contracts.show', $contract) }}"
                                                                     class="btn btn-soft-info btn-sm" data-bs-toggle="tooltip"
-                                                                    data-bs-placement="top" data-bs-title="Detail Kontrak">
+                                                                    data-bs-placement="top" data-bs-title="Detail Kontrak & Alokasi Cuti/Izin">
                                                                     <iconify-icon icon="solar:eye-broken"
                                                                         class="align-middle fs-18"></iconify-icon>
                                                                 </a>

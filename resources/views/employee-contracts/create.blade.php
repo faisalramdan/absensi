@@ -13,7 +13,8 @@
                                     Membuat Kontrak Karyawan
                                 </h4>
                             </div>
-                            {{-- Tampilkan Error dari Controller (seperti error User belum terhubung) --}}
+                            
+                            {{-- Tampilkan Error dari Controller --}}
                             @if (session('error'))
                                 <div class="alert alert-danger alert-dismissible fade show" role="alert">
                                     <strong>Gagal!</strong> {{ session('error') }}
@@ -21,7 +22,7 @@
                                 </div>
                             @endif
 
-                            {{-- Tampilkan Error Validasi (seperti kolom kosong atau tanggal bentrok) --}}
+                            {{-- Tampilkan Error Validasi --}}
                             @if ($errors->any())
                                 <div class="alert alert-danger alert-dismissible fade show" role="alert">
                                     <strong>Ups! Ada yang salah dengan inputan Anda:</strong>
@@ -33,11 +34,36 @@
                                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                                 </div>
                             @endif
+
                             <div class="card-body">
                                 <form action="{{ route('employee-contracts.store') }}" method="POST" enctype="multipart/form-data">
                                     @csrf
+                                    
+                                    @php
+                                        // Tentukan default company_id: dari old(), atau dari relasi user login
+                                        $defaultCompanyId = old('company_id', auth()->user()->employee?->company_id ?? '');
+                                    @endphp
+
                                     <div class="row">
-                                        
+                                        {{-- 1. Pilihan Perusahaan (Company) --}}
+                                        <div class="col-md-6 mb-3">
+                                            <label for="company_id" class="form-label fw-semibold">
+                                                Perusahaan <span class="text-danger">*</span>
+                                            </label>
+                                            <select class="form-control @error('company_id') is-invalid @enderror" id="company_id" name="company_id" required>
+                                                <option value="">-- Pilih Perusahaan --</option>
+                                                @foreach($companies as $company)
+                                                    <option value="{{ $company->id }}" {{ $defaultCompanyId == $company->id ? 'selected' : '' }}>
+                                                        {{ $company->name }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            @error('company_id')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+
+                                        {{-- 2. Pilihan Karyawan (Tersaring Berdasarkan Perusahaan) --}}
                                         <div class="col-md-6 mb-3">
                                             <label for="employee_id" class="form-label fw-semibold">
                                                 Karyawan <span class="text-danger">*</span>
@@ -45,7 +71,7 @@
                                             <select class="form-control @error('employee_id') is-invalid @enderror" id="employee_id" name="employee_id" required>
                                                 <option value="">-- Pilih Karyawan --</option>
                                                 @foreach($employees as $employee)
-                                                    <option value="{{ $employee->id }}" {{ old('employee_id') == $employee->id ? 'selected' : '' }}>
+                                                    <option value="{{ $employee->id }}" data-company-id="{{ $employee->company_id }}" {{ old('employee_id') == $employee->id ? 'selected' : '' }}>
                                                         {{ $employee->full_name }} ({{ $employee->nik ?? 'No NIK' }})
                                                     </option>
                                                 @endforeach
@@ -72,7 +98,7 @@
                                             @enderror
                                         </div>
 
-                                        <div class="col-md-12 mb-3">
+                                        <div class="col-md-6 mb-3">
                                             <label for="contract_number" class="form-label fw-semibold">
                                                 Nomor Kontrak
                                             </label>
@@ -188,4 +214,62 @@
             </div>
         </div>
     </div>
+
+    {{-- Skrip JavaScript untuk Sinkronisasi Dropdown Perusahaan -> Karyawan --}}
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const companySelect = document.getElementById("company_id");
+            const employeeSelect = document.getElementById("employee_id");
+
+            if (companySelect && employeeSelect) {
+                // Simpan seluruh opsi karyawan asli yang ada
+                const originalOptions = Array.from(employeeSelect.options).map(option => ({
+                    value: option.value,
+                    text: option.text,
+                    companyId: option.getAttribute("data-company-id")
+                }));
+
+                const oldEmployeeSelected = "{{ old('employee_id') }}";
+
+                function filterEmployees() {
+                    const selectedCompany = companySelect.value;
+                    employeeSelect.innerHTML = "";
+
+                    // Tambahkan opsi default
+                    const defaultOpt = document.createElement("option");
+                    defaultOpt.value = "";
+                    defaultOpt.text = "-- Pilih Karyawan --";
+                    employeeSelect.appendChild(defaultOpt);
+
+                    // Masukkan karyawan yang sesuai dengan company_id
+                    originalOptions.forEach(opt => {
+                        if (opt.value !== "") {
+                            if (selectedCompany === "" || opt.companyId === selectedCompany) {
+                                const newOpt = document.createElement("option");
+                                newOpt.value = opt.value;
+                                newOpt.textContent = opt.text;
+                                newOpt.setAttribute("data-company-id", opt.companyId);
+
+                                // Set selected kembali jika cocok dengan old value
+                                if (newOpt.value === oldEmployeeSelected) {
+                                    newOpt.selected = true;
+                                }
+
+                                employeeSelect.appendChild(newOpt);
+                            }
+                        }
+                    });
+                }
+
+                // Jalankan filter saat dropdown perusahaan diubah oleh user
+                companySelect.addEventListener("change", function () {
+                    employeeSelect.value = ""; // Reset pilihan karyawan
+                    filterEmployees();
+                });
+
+                // Jalankan filter otomatis saat halaman pertama kali dimuat (menyesuaikan default perusahaan login atau old value)
+                filterEmployees();
+            }
+        });
+    </script>
 @endsection

@@ -87,15 +87,20 @@ class EmployeeContractController extends Controller
      */
     public function create()
     {
+        // 1. Ambil semua data perusahaan yang aktif
+        $companies = Company::where('is_active', true)->orderBy('name')->get();
+
+        // 2. Ambil semua karyawan aktif (pastikan menyertakan company_id agar bisa difilter di JavaScript)
         $employees = Employee::where('is_active', true)
             ->orderBy('full_name')
-            ->get();
+            ->get(['id', 'nik', 'full_name', 'company_id']);
 
+        // 3. Ambil data status pekerjaan
         $statuses = EmployeeStatus::where('is_active', true)
             ->orderBy('name')
             ->get();
 
-        return view('employee-contracts.create', compact('employees', 'statuses'));
+        return view('employee-contracts.create', compact('companies', 'employees', 'statuses'));
     }
     public function store(Request $request)
     {
