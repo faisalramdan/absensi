@@ -78,7 +78,7 @@
                                                 <span class="text-danger">*</span>
                                             </label>
 
-                                            <input type="date" name="start_date" value="{{ old('start_date') }}"
+                                            <input type="date" id="start_date" name="start_date" value="{{ old('start_date') }}"
                                                 class="form-control" required>
                                         </div>
 
@@ -88,7 +88,7 @@
                                                 <span class="text-danger">*</span>
                                             </label>
 
-                                            <input type="date" name="end_date" value="{{ old('end_date') }}"
+                                            <input type="date" id="end_date" name="end_date" value="{{ old('end_date') }}"
                                                 class="form-control" required>
                                         </div>
 
@@ -175,5 +175,16 @@
             </div>
         </div>
     </div>
+<script>
+    const startDate = document.getElementById('start_date');
+    const endDate = document.getElementById('end_date');
 
+    startDate.addEventListener('change', function () {
+        // Otomatis isi tanggal selesai sama dengan tanggal mulai
+        endDate.value = this.value;
+
+        // Tanggal selesai tidak boleh sebelum tanggal mulai
+        endDate.min = this.value;
+    });
+</script>
 @endsection

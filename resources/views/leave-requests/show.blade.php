@@ -88,34 +88,7 @@
                                 </table>
                             </div>
 
-                            @if($leaveRequest->canApprove(auth()->user()->employee))
 
-                                <hr>
-
-                                <div class="text-end">
-
-                                    <form action="{{ route('leave-requests.approve', $leaveRequest) }}" method="POST"
-                                        class="d-inline">
-
-                                        @csrf
-
-                                        <button class="btn btn-success">
-
-                                            Approve
-
-                                        </button>
-
-                                    </form>
-
-                                    <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal">
-
-                                        Reject
-
-                                    </button>
-
-                                </div>
-
-                            @endif
 
                         </div>
                     </div>

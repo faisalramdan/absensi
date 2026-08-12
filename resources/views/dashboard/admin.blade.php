@@ -134,8 +134,12 @@
                                                     <div>
                                                         <h6 class="mb-0">{{ $leave->employee->full_name ?? $leave->employee->name ?? 'Nama Karyawan' }}</h6>
                                                         <small class="text-muted">
-                                                            {{ \Carbon\Carbon::parse($leave->start_date)->format('d M') }} -
-                                                            {{ \Carbon\Carbon::parse($leave->end_date)->format('d M Y') }}
+                                                            @if (\Carbon\Carbon::parse($leave->start_date)->isSameDay(\Carbon\Carbon::parse($leave->end_date)))
+                                                                {{ \Carbon\Carbon::parse($leave->start_date)->format('d M Y') }}
+                                                            @else
+                                                                {{ \Carbon\Carbon::parse($leave->start_date)->format('d M') }} -
+                                                                {{ \Carbon\Carbon::parse($leave->end_date)->format('d M Y') }}
+                                                            @endif
                                                         </small>
                                                     </div>
                                                     <span class="badge bg-info">{{ $leave->leaveType->name ?? 'Cuti/Izin' }}</span>

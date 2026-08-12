@@ -165,7 +165,14 @@
 
                                                 <tr>
                                                     <td>{{ $loop->iteration }}</td>
-                                                    <td>{{ \Carbon\Carbon::parse($leave->created_at)->format('d M Y H:i:s') }}
+                                                    <td>
+                                                        <div>
+                                                            {{ \Carbon\Carbon::parse($leave->created_at)->format('d M Y') }}
+                                                        </div>
+                                                        <small class="text-muted">
+                                                            {{ \Carbon\Carbon::parse($leave->created_at)->format('H:i:s') }}
+                                                        </small>
+                                                    </td>
                                                     </td>
                                                     <td class="text-primary fw-semibold">{{ $leave->leaveType?->name }}</td>
 
