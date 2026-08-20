@@ -530,8 +530,8 @@ class LeaveRequestController extends Controller
 
             // Ubah pesan sukses agar dinamis tergantung jenis cuti
             $pesanSukses = $isUnlimited
-                ? 'Pengajuan izin khusus berhasil disetujui.'
-                : 'Pengajuan cuti berhasil disetujui dan kuota jatah cuti karyawan telah dipotong.';
+                ? 'Pengajuan izin khusus/sakit berhasil disetujui.'
+                : 'Pengajuan izin/cuti berhasil disetujui dan kuota jatah izin/cuti karyawan telah dipotong.';
 
             return redirect()->back()->with('success', $pesanSukses);
 
