@@ -182,7 +182,7 @@
                                     </div>
 
                                     {{-- Status --}}
-                                    <div class="col-md-12 mb-3">
+                                    <div class="col-md-6 mb-3">
 
                                         <label class="form-label fw-semibold">
                                             Status
@@ -195,7 +195,7 @@
                                                 type="checkbox"
                                                 name="is_active"
                                                 value="1"
-                                                {{ $leaveType->is_active ? 'checked' : '' }}>
+                                                {{ old('is_active', $leaveType->is_active) ? 'checked' : '' }}>
 
                                             <label class="form-check-label">
                                                 {{ $leaveType->is_active ? 'Aktif' : 'Non Aktif' }}
@@ -204,6 +204,33 @@
                                         </div>
 
                                     </div>
+
+                                    {{-- Tanpa Batas (Unlimited) --}}
+                                    <div class="col-md-6 mb-3">
+
+                                        <label class="form-label fw-semibold">
+                                            Tanpa Batas Kuota
+                                        </label>
+
+                                        <div class="form-check form-switch">
+
+                                            <input
+                                                class="form-check-input"
+                                                type="checkbox"
+                                                name="is_unlimited"
+                                                value="1"
+                                                id="is_unlimited_switch"
+                                                {{ old('is_unlimited', $leaveType->is_unlimited) ? 'checked' : '' }}>
+
+                                            <label class="form-check-label" for="is_unlimited_switch">
+                                                Ya, Tanpa Batas
+                                            </label>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
 
                                 </div>
 

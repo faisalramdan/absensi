@@ -102,6 +102,10 @@ class LeaveTypeController extends Controller
             'reset_period' => $request->reset_period,
             'description' => $request->description,
             'is_active' => $request->boolean('is_active'),
+            // --- TAMBAHKAN BARIS INI ---
+            'is_unlimited' => $request->boolean('is_unlimited'),
+            // ---------------------------
+
 
             'created_by' => auth()->id(),
             'updated_by' => auth()->id(),
@@ -177,6 +181,9 @@ class LeaveTypeController extends Controller
             'reset_period' => $request->reset_period,
             'description' => $request->description,
             'is_active' => $request->boolean('is_active'),
+            // --- TAMBAHKAN BARIS INI DI FUNGSI UPDATE ---
+            'is_unlimited' => $request->boolean('is_unlimited'),
+            // --------------------------------------------
 
             'updated_by' => auth()->id(),
 
