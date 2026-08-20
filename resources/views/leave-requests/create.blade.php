@@ -60,7 +60,7 @@
                                                         {{ $leaveType->name }}
 
                                                         @if($isUnlimited)
-                                                            - [Tanpa Batas Kuota]
+                                                            - []
                                                         @else
                                                             (Sisa {{ $remaining }} / {{ $allocated }} Hari)
                                                             @if($remaining <= 0)
