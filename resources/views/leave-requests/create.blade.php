@@ -36,40 +36,43 @@
                                     <div class="row">
 
                                         <div class="col-md-6 mb-3">
-                                            <label class="form-label fw-semibold">
-                                                Jenis Cuti
-                                                <span class="text-danger">*</span>
-                                            </label>
+                                        <label class="form-label fw-semibold">
+                                            Jenis Cuti
+                                            <span class="text-danger">*</span>
+                                        </label>
 
-                                            <select name="leave_type_id" class="form-select" required>
-                                                <option value="">Pilih</option>
+                                        <select name="leave_type_id" class="form-select" required>
+                                            <option value="">Pilih</option>
 
-                                                {{-- Mengubah looping dari master LeaveType menjadi dari LeaveAllocation
-                                                karyawan --}}
-                                                @foreach($leaveAllocations ?? [] as $allocation)
-                                                    @php
-                                                        // Mengambil model leaveType dari relasi allocation
-                                                        $leaveType = $allocation->leaveType;
+                                            @foreach($leaveAllocations ?? [] as $allocation)
+                                                @php
+                                                    $leaveType = $allocation->leaveType;
+                                                    $isUnlimited = $leaveType?->is_unlimited ?? false;
 
-                                                        // Menghilangkan desimal .00 menggunakan floatval
-                                                        $remaining = floatval($allocation->remaining_days);
-                                                        $allocated = floatval($allocation->allocated_days);
-                                                    @endphp
+                                                    $remaining = floatval($allocation->remaining_days);
+                                                    $allocated = floatval($allocation->allocated_days);
+                                                @endphp
 
-                                                    @if($leaveType)
-                                                        {{-- Hanya memunculkan jika jatah cuti masih ada atau bisa diajukan --}}
-                                                        <option value="{{ $leaveType->id }}" {{ $remaining <= 0 ? 'disabled class=text-muted' : '' }}>
-                                                            {{ $leaveType->name }}
+                                                @if($leaveType)
+                                                    <option value="{{ $leaveType->id }}" 
+                                                        {{ (!$isUnlimited && $remaining <= 0) ? 'disabled class=text-muted' : '' }}>
+                                                        
+                                                        {{ $leaveType->name }}
+
+                                                        @if($isUnlimited)
+                                                            - [Tanpa Batas Kuota]
+                                                        @else
                                                             (Sisa {{ $remaining }} / {{ $allocated }} Hari)
-
                                                             @if($remaining <= 0)
                                                                 - [Kuota Habis]
                                                             @endif
-                                                        </option>
-                                                    @endif
-                                                @endforeach
-                                            </select>
-                                        </div>
+                                                        @endif
+
+                                                    </option>
+                                                @endif
+                                            @endforeach
+                                        </select>
+                                    </div>
 
 
                                         <div class="col-md-3 mb-3">

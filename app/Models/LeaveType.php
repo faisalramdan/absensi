@@ -12,6 +12,7 @@ class LeaveType extends Model
         'tag',
         'type',
         'quota',
+        'is_unlimited', // <-- Tambahkan di sini
         'reset_period',
         'description',
         'is_active',
@@ -20,6 +21,7 @@ class LeaveType extends Model
     ];
 
     protected $casts = [
+        'is_unlimited' => 'boolean', // <-- Tambahkan cast boolean agar terbaca true/false
         'is_active' => 'boolean',
     ];
 

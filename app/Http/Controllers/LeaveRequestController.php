@@ -101,7 +101,11 @@ class LeaveRequestController extends Controller
             );
         }
 
-        // 1. Cari kontrak aktif karyawan ini untuk mencocokkan alokasi cutinya
+        // 1. Ambil data Jenis Cuti untuk mengecek status is_unlimited
+        $leaveType = \App\Models\LeaveType::findOrFail($request->leave_type_id);
+        $isUnlimited = $leaveType->is_unlimited;
+
+        // 2. Cari kontrak aktif karyawan ini 
         $activeContract = \App\Models\EmployeeContract::where('employee_id', $employee->id)
             ->where('is_active', true)
             ->latest()
@@ -113,39 +117,43 @@ class LeaveRequestController extends Controller
             ]);
         }
 
-        // 2. Ambil data alokasi jatah cuti dari kontrak aktif tersebut
-        $allocation = \App\Models\LeaveAllocation::where('employee_contract_id', $activeContract->id)
-            ->where('leave_type_id', $request->leave_type_id)
-            ->first();
-
-        if (!$allocation) {
-            return back()->withInput()->withErrors([
-                'leave_type_id' => 'Jatah cuti untuk jenis ini belum dialokasikan oleh HRD pada kontrak Anda.'
-            ]);
-        }
-
         // Hitung jumlah hari pengajuan
         $start = \Carbon\Carbon::parse($request->start_date);
         $end = \Carbon\Carbon::parse($request->end_date);
         $totalDays = $start->diffInDays($end) + 1;
 
-        // Ambil sisa cuti langsung dari kolom remaining_days di tabel alokasi
-        $remainingLeave = floatval($allocation->remaining_days);
+        // 3. JIKA BUKAN CUTI TANPA BATAS (Harus cek kuota)
+        if (!$isUnlimited) {
+            // Ambil data alokasi jatah cuti dari kontrak aktif tersebut
+            $allocation = \App\Models\LeaveAllocation::where('employee_contract_id', $activeContract->id)
+                ->where('leave_type_id', $request->leave_type_id)
+                ->first();
 
-        // Jika kuota sudah habis
-        if ($remainingLeave <= 0) {
-            return back()->withInput()->withErrors([
-                'leave_type_id' => 'Kuota cuti Anda sudah habis.'
-            ]);
+            if (!$allocation) {
+                return back()->withInput()->withErrors([
+                    'leave_type_id' => 'Jatah cuti untuk jenis ini belum dialokasikan oleh HRD pada kontrak Anda.'
+                ]);
+            }
+
+            // Ambil sisa cuti langsung dari kolom remaining_days di tabel alokasi
+            $remainingLeave = floatval($allocation->remaining_days);
+
+            // Jika kuota sudah habis
+            if ($remainingLeave <= 0) {
+                return back()->withInput()->withErrors([
+                    'leave_type_id' => 'Kuota cuti Anda sudah habis.'
+                ]);
+            }
+
+            // Jika pengajuan melebihi sisa cuti
+            if ($totalDays > $remainingLeave) {
+                return back()->withInput()->withErrors([
+                    'leave_type_id' => 'Sisa cuti Anda hanya ' . $remainingLeave . ' hari. Pengajuan Anda: ' . $totalDays . ' hari.'
+                ]);
+            }
         }
 
-        // Jika pengajuan melebihi sisa cuti
-        if ($totalDays > $remainingLeave) {
-            return back()->withInput()->withErrors([
-                'leave_type_id' => 'Sisa cuti Anda hanya ' . $remainingLeave . ' hari. Pengajuan Anda: ' . $totalDays . ' hari.'
-            ]);
-        }
-
+        // 4. Proses Upload File (Jika ada)
         $attachment = null;
         if ($request->hasFile('attachment')) {
             $attachment = $request->file('attachment')->store(
@@ -154,7 +162,8 @@ class LeaveRequestController extends Controller
             );
         }
 
-        // 3. Simpan data pengajuan cuti menggunakan employee_id
+        // 5. Simpan data pengajuan cuti menggunakan employee_id
+        // Pastikan model LeaveRequest sudah diimport (use App\Models\LeaveRequest;)
         $leaveRequest = LeaveRequest::create([
             'employee_id' => $employee->id,
             'leave_type_id' => $request->leave_type_id,
@@ -164,10 +173,11 @@ class LeaveRequestController extends Controller
             'reason' => $request->reason,
             'attachment' => $attachment,
             'status' => 'pending',
-            'created_by' => $employee->id, // Diubah ke employee_id
-            'updated_by' => $employee->id, // Diubah ke employee_id
+            'created_by' => $employee->id,
+            'updated_by' => $employee->id,
         ]);
 
+        // 6. Log Aktivitas
         ActivityLogger::log(
             'Leave Request',
             'Create',
