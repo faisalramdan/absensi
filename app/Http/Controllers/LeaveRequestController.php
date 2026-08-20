@@ -474,6 +474,10 @@ class LeaveRequestController extends Controller
             return redirect()->back()->with('error', 'Pengajuan ini sudah diproses sebelumnya.');
         }
 
+        // KUNCI PERBAIKAN: Cek apakah tipe cuti ini adalah "Cuti Tanpa Batas" (is_unlimited)
+        $leaveType = \App\Models\LeaveType::find($leaveRequest->leave_type_id);
+        $isUnlimited = $leaveType ? $leaveType->is_unlimited : false;
+
         // Gunakan Database Transaction agar sinkronisasi data kuota aman dan tidak bentrok
         \DB::beginTransaction();
 
@@ -488,26 +492,30 @@ class LeaveRequestController extends Controller
                 return redirect()->back()->with('error', 'Gagal memproses. Karyawan yang mengajukan cuti tidak memiliki kontrak aktif.');
             }
 
-            // 2. Cari baris alokasi kuota yang sesuai dengan tipe cuti yang diajukan
-            $allocation = \App\Models\LeaveAllocation::where('employee_contract_id', $activeContract->id)
-                ->where('leave_type_id', $leaveRequest->leave_type_id)
-                ->first();
+            // --- JIKA BUKAN CUTI TANPA BATAS, LAKUKAN VALIDASI & PEMOTONGAN KUOTA ---
+            if (!$isUnlimited) {
+                // 2. Cari baris alokasi kuota yang sesuai dengan tipe cuti yang diajukan
+                $allocation = \App\Models\LeaveAllocation::where('employee_contract_id', $activeContract->id)
+                    ->where('leave_type_id', $leaveRequest->leave_type_id)
+                    ->first();
 
-            if (!$allocation) {
-                return redirect()->back()->with('error', 'Gagal memproses. Jatah alokasi cuti untuk jenis ini tidak ditemukan pada kontrak karyawan.');
+                if (!$allocation) {
+                    return redirect()->back()->with('error', 'Gagal memproses. Jatah alokasi cuti untuk jenis ini tidak ditemukan pada kontrak karyawan.');
+                }
+
+                // 3. Validasi ulang sisa kuota (memastikan jatahnya masih cukup sebelum di-approve)
+                if ($allocation->remaining_days < $leaveRequest->total_days) {
+                    return redirect()->back()->with('error', 'Gagal menyetujui. Sisa kuota cuti karyawan tidak mencukupi.');
+                }
+
+                // 4. Potong kuota di tabel Leave Allocation
+                $allocation->update([
+                    'used_days' => $allocation->used_days + $leaveRequest->total_days,
+                    'remaining_days' => $allocation->remaining_days - $leaveRequest->total_days,
+                    'updated_by' => $approverEmployee->id,
+                ]);
             }
-
-            // 3. Validasi ulang sisa kuota (memastikan jatahnya masih cukup sebelum di-approve)
-            if ($allocation->remaining_days < $leaveRequest->total_days) {
-                return redirect()->back()->with('error', 'Gagal menyetujui. Sisa kuota cuti karyawan tidak mencukupi.');
-            }
-
-            // 4. Potong kuota di tabel Leave Allocation
-            $allocation->update([
-                'used_days' => $allocation->used_days + $leaveRequest->total_days,
-                'remaining_days' => $allocation->remaining_days - $leaveRequest->total_days,
-                'updated_by' => $approverEmployee->id,
-            ]);
+            // --- SELESAI PROSES VALIDASI KUOTA ---
 
             // 5. Eksekusi update status pengajuan cuti menggunakan ID Employee (bukan ID User)
             $leaveRequest->update([
@@ -519,7 +527,13 @@ class LeaveRequestController extends Controller
             ]);
 
             \DB::commit();
-            return redirect()->back()->with('success', 'Pengajuan cuti berhasil disetujui dan kuota jatah cuti karyawan telah dipotong.');
+
+            // Ubah pesan sukses agar dinamis tergantung jenis cuti
+            $pesanSukses = $isUnlimited
+                ? 'Pengajuan izin khusus berhasil disetujui.'
+                : 'Pengajuan cuti berhasil disetujui dan kuota jatah cuti karyawan telah dipotong.';
+
+            return redirect()->back()->with('success', $pesanSukses);
 
         } catch (\Exception $e) {
             \DB::rollBack();
