@@ -126,7 +126,7 @@
                                 <div class="card-header">
                                     <h4 class="card-title">Cuti/Izin Bulan Ini (Approved)</h4>
                                 </div>
-                                <div class="card-body">
+                                <div class="card-body" style="max-height: 400px; overflow-y: auto;">
                                     @if(isset($approvedLeaves) && $approvedLeaves->count() > 0)
                                         <ul class="list-group list-group-flush">
                                             @foreach($approvedLeaves as $leave)
@@ -142,7 +142,24 @@
                                                             @endif
                                                         </small>
                                                     </div>
-                                                    <span class="badge bg-info">{{ $leave->leaveType->name ?? 'Cuti/Izin' }}</span>
+                                                    @php
+                                                        // Ambil nama cuti dan ubah ke huruf kecil semua agar mudah dicek
+                                                        $leaveName = strtolower($leave->leaveType->name ?? '');
+                                                        $badgeColor = 'bg-info'; // Warna default jika tidak ada yang cocok (Biru Muda)
+
+                                                        if (str_contains($leaveName, 'sakit')) {
+                                                            $badgeColor = 'bg-danger'; // Merah
+                                                        } elseif (str_contains($leaveName, 'cuti')) {
+                                                            $badgeColor = 'bg-success'; // Hijau
+                                                        } elseif (str_contains($leaveName, 'khusus')) {
+                                                            $badgeColor = 'bg-primary'; // Biru Tua
+                                                        } elseif (str_contains($leaveName, 'izin') || str_contains($leaveName, 'ijin')) {
+                                                            $badgeColor = 'bg-warning text-dark'; // Kuning (dengan teks gelap agar terbaca)
+                                                        }
+                                                    @endphp
+
+                                                    {{-- Badge dengan warna dinamis --}}
+                                                    <span class="badge {{ $badgeColor }}">{{ $leave->leaveType->name ?? 'Cuti/Izin' }}</span>
                                                 </li>
                                             @endforeach
                                         </ul>

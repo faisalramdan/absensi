@@ -182,25 +182,18 @@ class AttendanceMonthlyController extends Controller
                     // 🔥 FIX AKURAT: Gunakan perbandingan nilai integer murni dari model attribute 
                     'short_work_count' => $items->filter(function ($item) {
                         $shortMinutes = (int) ($item->short_work_minutes ?? 0);
-                        $isIdt = filter_var($item->is_idt, FILTER_VALIDATE_BOOLEAN);
-                        $isIpc = filter_var($item->is_ipc, FILTER_VALIDATE_BOOLEAN);
+                        ;
 
                         return $shortMinutes > 0
-                            && !in_array($item->status, ['wfa', 'holiday', 'off'])
-                            && !$isIdt
-                            && !$isIpc;
+                            && !in_array($item->status, ['wfa', 'holiday', 'off']);
                     })->count(),
 
                     // 🔥 FIX AKURAT: Jumlahkan total menit dengan memetakan datanya ke bentuk int terlebih dahulu
                     'kurang_jam' => $items->filter(function ($item) {
                         $shortMinutes = (int) ($item->short_work_minutes ?? 0);
-                        $isIdt = filter_var($item->is_idt, FILTER_VALIDATE_BOOLEAN);
-                        $isIpc = filter_var($item->is_ipc, FILTER_VALIDATE_BOOLEAN);
 
                         return $shortMinutes > 0
-                            && !in_array($item->status, ['wfa', 'holiday', 'off'])
-                            && !$isIdt
-                            && !$isIpc;
+                            && !in_array($item->status, ['wfa', 'holiday', 'off']);
                     })->sum(function ($item) {
                         return (int) $item->short_work_minutes;
                     }),
@@ -347,9 +340,7 @@ class AttendanceMonthlyController extends Controller
             })->sum('early_leave_minutes'),
             'short_work_count' => $attendances->filter(function ($row) {
                 return $row->short_work_minutes > 0
-                    && !in_array($row->status, ['wfa', 'holiday', 'off'])
-                    && $row->is_idt != true
-                    && $row->is_ipc != true;
+                    && !in_array($row->status, ['wfa', 'holiday', 'off']);
             })->count(),
             'total_short_work_minutes' => $attendances->filter(function ($row) {
                 return $row->short_work_minutes > 0

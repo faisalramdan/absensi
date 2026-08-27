@@ -221,24 +221,13 @@ class AttendanceController extends Controller
             'short_work_count' => (clone $query)
                 ->where('short_work_minutes', '>', 0)
                 ->whereNotIn('status', ['wfa', 'holiday', 'off'])
-                ->where(function ($q) {
-                    $q->where('is_idt', '!=', true)->orWhereNull('is_idt');
-                })
-                ->where(function ($q) {
-                    $q->where('is_ipc', '!=', true)->orWhereNull('is_ipc');
-                })
+
                 ->count(),
 
             // Menghitung total akumulasi menit kurang jam kerja
             'total_short_work_minutes' => (clone $query)
                 ->where('short_work_minutes', '>', 0)
                 ->whereNotIn('status', ['wfa', 'holiday', 'off'])
-                ->where(function ($q) {
-                    $q->where('is_idt', '!=', true)->orWhereNull('is_idt');
-                })
-                ->where(function ($q) {
-                    $q->where('is_ipc', '!=', true)->orWhereNull('is_ipc');
-                })
                 ->sum('short_work_minutes'),
         ];
 
