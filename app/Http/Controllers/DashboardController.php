@@ -203,9 +203,7 @@ class DashboardController extends Controller
 
             'short_work_count' => $myAttendances->filter(function ($item) {
                 return (int) $item->short_work_minutes > 0
-                    && !in_array(strtolower($item->status), ['wfa', 'holiday', 'off', 'leave'])
-                    && !$item->is_idt
-                    && !$item->is_ipc;
+                    && !in_array(strtolower($item->status), ['wfa', 'holiday', 'off', 'leave']);
             })->count(),
 
             'total_work_minutes' => $myAttendances->filter(fn($i) => strtolower($i->status) === 'present')->sum('work_minutes'),
@@ -219,9 +217,7 @@ class DashboardController extends Controller
 
             'total_short_work_minutes' => $myAttendances->filter(function ($item) {
                 return (int) $item->short_work_minutes > 0
-                    && !in_array(strtolower($item->status), ['wfa', 'holiday', 'off', 'leave'])
-                    && !$item->is_idt
-                    && !$item->is_ipc;
+                    && !in_array(strtolower($item->status), ['wfa', 'holiday', 'off', 'leave']);
             })->sum('short_work_minutes'),
         ];
 
