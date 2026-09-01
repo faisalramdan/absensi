@@ -118,6 +118,43 @@ class DashboardController extends Controller
             $leaveAllocations = LeaveAllocation::with('leaveType')
                 ->where('employee_contract_id', $activeContract->id)
                 ->get();
+
+            $currentMonth = date('m');
+            $currentYear = date('Y');
+
+            foreach ($leaveAllocations as $allocation) {
+                $leaveType = $allocation->leaveType;
+
+                if ($leaveType && !$leaveType->is_unlimited) {
+                    $quota = floatval($leaveType->quota);
+
+                    // Jika tipe cuti mereset setiap bulan (seperti IDT)
+                    if ($leaveType->reset_period === 'month') {
+                        $used = \App\Models\LeaveRequest::where('employee_id', $employee->id)
+                            ->where('leave_type_id', $leaveType->id)
+                            ->whereIn('status', ['pending', 'approved'])
+                            ->whereMonth('start_date', $currentMonth)
+                            ->whereYear('start_date', $currentYear)
+                            ->sum('total_days');
+
+                        $allocation->used_days = $used;
+                        $allocation->remaining_days = max(0, $quota - $used);
+                        $allocation->allocated_days = $quota;
+
+                        // Jika tipe cuti mereset setiap tahun
+                    } elseif ($leaveType->reset_period === 'year') {
+                        $used = \App\Models\LeaveRequest::where('employee_id', $employee->id)
+                            ->where('leave_type_id', $leaveType->id)
+                            ->whereIn('status', ['pending', 'approved'])
+                            ->whereYear('start_date', $currentYear)
+                            ->sum('total_days');
+
+                        $allocation->used_days = $used;
+                        $allocation->remaining_days = max(0, $quota - $used);
+                        $allocation->allocated_days = $quota;
+                    }
+                }
+            }
         }
 
         $pendingLeaves = $employee->leaveRequests()->where('status', 'pending')->count();

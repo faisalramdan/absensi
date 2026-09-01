@@ -67,6 +67,39 @@ class LeaveRequestController extends Controller
             $leaveAllocations = \App\Models\LeaveAllocation::where('employee_contract_id', $activeContract->id)
                 ->with('leaveType')
                 ->get();
+
+            $currentMonth = date('m');
+            $currentYear = date('Y');
+
+            foreach ($leaveAllocations as $allocation) {
+                $leaveType = $allocation->leaveType;
+
+                if ($leaveType && !$leaveType->is_unlimited) {
+                    $quota = floatval($leaveType->quota);
+
+                    if ($leaveType->reset_period === 'month') {
+                        $used = \App\Models\LeaveRequest::where('employee_id', $employee->id)
+                            ->where('leave_type_id', $leaveType->id)
+                            ->whereIn('status', ['pending', 'approved'])
+                            ->whereMonth('start_date', $currentMonth)
+                            ->whereYear('start_date', $currentYear)
+                            ->sum('total_days');
+
+                        $allocation->remaining_days = max(0, $quota - $used);
+                        $allocation->allocated_days = $quota;
+
+                    } elseif ($leaveType->reset_period === 'year') {
+                        $used = \App\Models\LeaveRequest::where('employee_id', $employee->id)
+                            ->where('leave_type_id', $leaveType->id)
+                            ->whereIn('status', ['pending', 'approved'])
+                            ->whereYear('start_date', $currentYear)
+                            ->sum('total_days');
+
+                        $allocation->remaining_days = max(0, $quota - $used);
+                        $allocation->allocated_days = $quota;
+                    }
+                }
+            }
         } else {
             $leaveAllocations = collect();
         }
@@ -101,59 +134,72 @@ class LeaveRequestController extends Controller
             );
         }
 
-        // 1. Ambil data Jenis Cuti untuk mengecek status is_unlimited
         $leaveType = \App\Models\LeaveType::findOrFail($request->leave_type_id);
         $isUnlimited = $leaveType->is_unlimited;
+        $resetPeriod = $leaveType->reset_period;
+        $quota = floatval($leaveType->quota);
 
-        // 2. Cari kontrak aktif karyawan ini 
-        $activeContract = \App\Models\EmployeeContract::where('employee_id', $employee->id)
-            ->where('is_active', true)
-            ->latest()
-            ->first();
-
-        if (!$activeContract) {
-            return back()->withInput()->withErrors([
-                'leave_type_id' => 'Anda tidak memiliki kontrak aktif yang terdaftar.'
-            ]);
-        }
-
-        // Hitung jumlah hari pengajuan
         $start = \Carbon\Carbon::parse($request->start_date);
         $end = \Carbon\Carbon::parse($request->end_date);
         $totalDays = $start->diffInDays($end) + 1;
 
-        // 3. JIKA BUKAN CUTI TANPA BATAS (Harus cek kuota)
         if (!$isUnlimited) {
-            // Ambil data alokasi jatah cuti dari kontrak aktif tersebut
-            $allocation = \App\Models\LeaveAllocation::where('employee_contract_id', $activeContract->id)
-                ->where('leave_type_id', $request->leave_type_id)
-                ->first();
+            if ($resetPeriod === 'month') {
+                $used = \App\Models\LeaveRequest::where('employee_id', $employee->id)
+                    ->where('leave_type_id', $leaveType->id)
+                    ->whereIn('status', ['pending', 'approved'])
+                    ->whereMonth('start_date', $start->month)
+                    ->whereYear('start_date', $start->year)
+                    ->sum('total_days');
 
-            if (!$allocation) {
-                return back()->withInput()->withErrors([
-                    'leave_type_id' => 'Jatah cuti untuk jenis ini belum dialokasikan oleh HRD pada kontrak Anda.'
-                ]);
-            }
+                $remainingLeave = $quota - $used;
 
-            // Ambil sisa cuti langsung dari kolom remaining_days di tabel alokasi
-            $remainingLeave = floatval($allocation->remaining_days);
+                if ($remainingLeave < $totalDays) {
+                    return back()->withInput()->withErrors([
+                        'leave_type_id' => 'Sisa kuota bulan ini hanya ' . $remainingLeave . ' hari. Pengajuan Anda: ' . $totalDays . ' hari.'
+                    ]);
+                }
 
-            // Jika kuota sudah habis
-            if ($remainingLeave <= 0) {
-                return back()->withInput()->withErrors([
-                    'leave_type_id' => 'Kuota cuti Anda sudah habis.'
-                ]);
-            }
+            } elseif ($resetPeriod === 'year') {
+                $used = \App\Models\LeaveRequest::where('employee_id', $employee->id)
+                    ->where('leave_type_id', $leaveType->id)
+                    ->whereIn('status', ['pending', 'approved'])
+                    ->whereYear('start_date', $start->year)
+                    ->sum('total_days');
 
-            // Jika pengajuan melebihi sisa cuti
-            if ($totalDays > $remainingLeave) {
-                return back()->withInput()->withErrors([
-                    'leave_type_id' => 'Sisa cuti Anda hanya ' . $remainingLeave . ' hari. Pengajuan Anda: ' . $totalDays . ' hari.'
-                ]);
+                $remainingLeave = $quota - $used;
+
+                if ($remainingLeave < $totalDays) {
+                    return back()->withInput()->withErrors([
+                        'leave_type_id' => 'Sisa kuota tahun ini hanya ' . $remainingLeave . ' hari. Pengajuan Anda: ' . $totalDays . ' hari.'
+                    ]);
+                }
+
+            } else {
+                // Untuk reset_period = 'never', gunakan tabel alokasi permanen
+                $activeContract = \App\Models\EmployeeContract::where('employee_id', $employee->id)
+                    ->where('is_active', true)
+                    ->latest()
+                    ->first();
+
+                if (!$activeContract) {
+                    return back()->withInput()->withErrors([
+                        'leave_type_id' => 'Anda tidak memiliki kontrak aktif yang terdaftar.'
+                    ]);
+                }
+
+                $allocation = \App\Models\LeaveAllocation::where('employee_contract_id', $activeContract->id)
+                    ->where('leave_type_id', $request->leave_type_id)
+                    ->first();
+
+                if (!$allocation || floatval($allocation->remaining_days) < $totalDays) {
+                    return back()->withInput()->withErrors([
+                        'leave_type_id' => 'Kuota cuti Anda sudah habis atau belum dialokasikan.'
+                    ]);
+                }
             }
         }
 
-        // 4. Proses Upload File (Jika ada)
         $attachment = null;
         if ($request->hasFile('attachment')) {
             $attachment = $request->file('attachment')->store(
@@ -162,8 +208,6 @@ class LeaveRequestController extends Controller
             );
         }
 
-        // 5. Simpan data pengajuan cuti menggunakan employee_id
-        // Pastikan model LeaveRequest sudah diimport (use App\Models\LeaveRequest;)
         $leaveRequest = LeaveRequest::create([
             'employee_id' => $employee->id,
             'leave_type_id' => $request->leave_type_id,
@@ -177,7 +221,6 @@ class LeaveRequestController extends Controller
             'updated_by' => $employee->id,
         ]);
 
-        // 6. Log Aktivitas
         ActivityLogger::log(
             'Leave Request',
             'Create',
@@ -193,7 +236,6 @@ class LeaveRequestController extends Controller
                 'Pengajuan berhasil dibuat.'
             );
     }
-
     public function show(
         LeaveRequest $leaveRequest
     ) {
@@ -237,87 +279,81 @@ class LeaveRequestController extends Controller
         );
     }
 
-    public function update(
-        Request $request,
-        LeaveRequest $leaveRequest
-    ) {
-
+    public function update(Request $request, LeaveRequest $leaveRequest)
+    {
         if ($leaveRequest->status != 'pending') {
-
-            return back()->with(
-                'error',
-                'Pengajuan yang sudah diproses tidak dapat diubah.'
-            );
-
+            return back()->with('error', 'Pengajuan yang sudah diproses tidak dapat diubah.');
         }
 
         $request->validate([
-
             'leave_type_id' => 'required|exists:leave_types,id',
-
             'start_date' => 'required|date',
-
             'end_date' => 'required|date|after_or_equal:start_date',
-
             'reason' => 'required',
-
             'attachment' => 'nullable|file|max:2048',
         ]);
 
-        $oldData = $leaveRequest->toArray();
+        $employee = auth()->user()->employee;
 
+        // 1. Cek Status Cuti Tanpa Batas (Unlimited)
+        $leaveType = \App\Models\LeaveType::findOrFail($request->leave_type_id);
+        $isUnlimited = $leaveType->is_unlimited;
+
+        $start = Carbon::parse($request->start_date);
+        $end = Carbon::parse($request->end_date);
+        $totalDays = $start->diffInDays($end) + 1;
+
+        // 2. Lakukan Validasi Kuota JIKA BUKAN Cuti Tanpa Batas
+        if (!$isUnlimited) {
+            $activeContract = \App\Models\EmployeeContract::where('employee_id', $employee->id)
+                ->where('is_active', true)
+                ->latest()
+                ->first();
+
+            if (!$activeContract) {
+                return back()->withInput()->withErrors([
+                    'leave_type_id' => 'Anda tidak memiliki kontrak aktif yang terdaftar.'
+                ]);
+            }
+
+            $allocation = \App\Models\LeaveAllocation::where('employee_contract_id', $activeContract->id)
+                ->where('leave_type_id', $request->leave_type_id)
+                ->first();
+
+            if (!$allocation) {
+                return back()->withInput()->withErrors([
+                    'leave_type_id' => 'Jatah cuti untuk jenis ini belum dialokasikan pada kontrak Anda.'
+                ]);
+            }
+
+            $remainingLeave = floatval($allocation->remaining_days);
+
+            if ($totalDays > $remainingLeave) {
+                return back()->withInput()->withErrors([
+                    'leave_type_id' => 'Sisa cuti Anda hanya ' . $remainingLeave . ' hari. Total pengajuan baru: ' . $totalDays . ' hari.'
+                ]);
+            }
+        }
+
+        // 3. Proses Upload File Pengganti
+        $oldData = $leaveRequest->toArray();
         $attachment = $leaveRequest->attachment;
 
         if ($request->hasFile('attachment')) {
-
-            if (
-                $leaveRequest->attachment &&
-                Storage::disk('public')->exists(
-                    $leaveRequest->attachment
-                )
-            ) {
-
-                Storage::disk('public')
-                    ->delete(
-                        $leaveRequest->attachment
-                    );
-
+            if ($attachment && Storage::disk('public')->exists($attachment)) {
+                Storage::disk('public')->delete($attachment);
             }
-
-            $attachment = $request
-                ->file('attachment')
-                ->store(
-                    'leave-requests',
-                    'public'
-                );
-
+            $attachment = $request->file('attachment')->store('leave-requests', 'public');
         }
 
-        $start = Carbon::parse(
-            $request->start_date
-        );
-
-        $end = Carbon::parse(
-            $request->end_date
-        );
-
-        $totalDays = $start
-            ->diffInDays($end) + 1;
-
+        // 4. Simpan Perubahan
         $leaveRequest->update([
-
             'leave_type_id' => $request->leave_type_id,
-
             'start_date' => $request->start_date,
-
             'end_date' => $request->end_date,
-
             'total_days' => $totalDays,
-
             'reason' => $request->reason,
-
             'attachment' => $attachment,
-
             'updated_by' => auth()->id(),
         ]);
 
@@ -329,12 +365,7 @@ class LeaveRequestController extends Controller
             $leaveRequest->fresh()->toArray()
         );
 
-        return redirect()
-            ->route('leave-requests.index')
-            ->with(
-                'success',
-                'Pengajuan berhasil diperbarui'
-            );
+        return redirect()->route('leave-requests.index')->with('success', 'Pengajuan berhasil diperbarui');
     }
 
     public function destroy(
@@ -474,15 +505,16 @@ class LeaveRequestController extends Controller
             return redirect()->back()->with('error', 'Pengajuan ini sudah diproses sebelumnya.');
         }
 
-        // KUNCI PERBAIKAN: Cek apakah tipe cuti ini adalah "Cuti Tanpa Batas" (is_unlimited)
+        // 1. Ambil data Jenis Cuti untuk cek is_unlimited dan reset_period
         $leaveType = \App\Models\LeaveType::find($leaveRequest->leave_type_id);
         $isUnlimited = $leaveType ? $leaveType->is_unlimited : false;
+        $resetPeriod = $leaveType ? $leaveType->reset_period : 'never';
 
         // Gunakan Database Transaction agar sinkronisasi data kuota aman dan tidak bentrok
         \DB::beginTransaction();
 
         try {
-            // 1. Cari kontrak aktif milik karyawan yang mengajukan cuti
+            // 2. Cari kontrak aktif milik karyawan yang mengajukan cuti
             $activeContract = \App\Models\EmployeeContract::where('employee_id', $leaveRequest->employee_id)
                 ->where('is_active', true)
                 ->latest()
@@ -492,46 +524,49 @@ class LeaveRequestController extends Controller
                 return redirect()->back()->with('error', 'Gagal memproses. Karyawan yang mengajukan cuti tidak memiliki kontrak aktif.');
             }
 
-            // --- JIKA BUKAN CUTI TANPA BATAS, LAKUKAN VALIDASI & PEMOTONGAN KUOTA ---
+            // --- JIKA BUKAN CUTI TANPA BATAS ---
             if (!$isUnlimited) {
-                // 2. Cari baris alokasi kuota yang sesuai dengan tipe cuti yang diajukan
-                $allocation = \App\Models\LeaveAllocation::where('employee_contract_id', $activeContract->id)
-                    ->where('leave_type_id', $leaveRequest->leave_type_id)
-                    ->first();
+                // HANYA POTONG KUOTA DI TABEL LeaveAllocation JIKA RESET PERIOD-NYA 'NEVER'
+                if ($resetPeriod === 'never') {
+                    $allocation = \App\Models\LeaveAllocation::where('employee_contract_id', $activeContract->id)
+                        ->where('leave_type_id', $leaveRequest->leave_type_id)
+                        ->first();
 
-                if (!$allocation) {
-                    return redirect()->back()->with('error', 'Gagal memproses. Jatah alokasi cuti untuk jenis ini tidak ditemukan pada kontrak karyawan.');
+                    if (!$allocation) {
+                        return redirect()->back()->with('error', 'Gagal memproses. Jatah alokasi cuti untuk jenis ini tidak ditemukan pada kontrak karyawan.');
+                    }
+
+                    if ($allocation->remaining_days < $leaveRequest->total_days) {
+                        return redirect()->back()->with('error', 'Gagal menyetujui. Sisa kuota cuti karyawan tidak mencukupi.');
+                    }
+
+                    // Potong kuota di tabel Leave Allocation secara permanen
+                    $allocation->update([
+                        'used_days' => $allocation->used_days + $leaveRequest->total_days,
+                        'remaining_days' => $allocation->remaining_days - $leaveRequest->total_days,
+                        'updated_by' => $approverEmployee->id,
+                    ]);
                 }
-
-                // 3. Validasi ulang sisa kuota (memastikan jatahnya masih cukup sebelum di-approve)
-                if ($allocation->remaining_days < $leaveRequest->total_days) {
-                    return redirect()->back()->with('error', 'Gagal menyetujui. Sisa kuota cuti karyawan tidak mencukupi.');
-                }
-
-                // 4. Potong kuota di tabel Leave Allocation
-                $allocation->update([
-                    'used_days' => $allocation->used_days + $leaveRequest->total_days,
-                    'remaining_days' => $allocation->remaining_days - $leaveRequest->total_days,
-                    'updated_by' => $approverEmployee->id,
-                ]);
+                // Jika reset_period 'month' atau 'year', kuota di-bypass dari LeaveAllocation 
+                // karena pembatasannya dihitung secara dinamis dari riwayat leave_requests.
             }
             // --- SELESAI PROSES VALIDASI KUOTA ---
 
-            // 5. Eksekusi update status pengajuan cuti menggunakan ID Employee (bukan ID User)
+            // 3. Eksekusi update status pengajuan cuti
             $leaveRequest->update([
                 'status' => 'approved',
-                'approved_by' => $approverEmployee->id, // Menyimpan ID Employee (misal: 19)
+                'approved_by' => $approverEmployee->id,
                 'approved_at' => now(),
                 'approval_notes' => $request->input('approval_notes'),
-                'updated_by' => $approverEmployee->id, // Menyimpan ID Employee yang sama
+                'updated_by' => $approverEmployee->id,
             ]);
 
             \DB::commit();
 
-            // Ubah pesan sukses agar dinamis tergantung jenis cuti
-            $pesanSukses = $isUnlimited
-                ? 'Pengajuan izin khusus/sakit berhasil disetujui.'
-                : 'Pengajuan izin/cuti berhasil disetujui dan kuota jatah izin/cuti karyawan telah dipotong.';
+            // Pesan sukses dinamis
+            $pesanSukses = ($isUnlimited || $resetPeriod !== 'never')
+                ? 'Pengajuan izin/cuti berhasil disetujui.'
+                : 'Pengajuan cuti berhasil disetujui dan kuota jatah cuti karyawan telah dipotong.';
 
             return redirect()->back()->with('success', $pesanSukses);
 

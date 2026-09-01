@@ -36,43 +36,45 @@
                                     <div class="row">
 
                                         <div class="col-md-6 mb-3">
-                                        <label class="form-label fw-semibold">
-                                            Jenis Cuti
-                                            <span class="text-danger">*</span>
-                                        </label>
+    <label class="form-label fw-semibold">
+        Jenis Cuti / Izin <span class="text-danger">*</span>
+    </label>
+    
+    <select name="leave_type_id" class="form-select" required>
+        <option value="">Pilih</option>
 
-                                        <select name="leave_type_id" class="form-select" required>
-                                            <option value="">Pilih</option>
+        @foreach($leaveAllocations ?? [] as $allocation)
+            @php
+                $leaveType = $allocation->leaveType;
+                
+                // Mendeteksi status cuti tanpa batas berdasarkan kolom is_unlimited
+                $isUnlimited = $leaveType?->is_unlimited ?? false;
 
-                                            @foreach($leaveAllocations ?? [] as $allocation)
-                                                @php
-                                                    $leaveType = $allocation->leaveType;
-                                                    $isUnlimited = $leaveType?->is_unlimited ?? false;
+                // Membaca nilai sisa dan kuota yang sudah dihitung ulang secara dinamis di Controller
+                $remaining = floatval($allocation->remaining_days);
+                $allocated = floatval($allocation->allocated_days);
+            @endphp
 
-                                                    $remaining = floatval($allocation->remaining_days);
-                                                    $allocated = floatval($allocation->allocated_days);
-                                                @endphp
+            @if($leaveType)
+                <option value="{{ $leaveType->id }}" 
+                    {{ (!$isUnlimited && $remaining <= 0) ? 'disabled class=text-muted' : '' }}>
+                    
+                    {{ $leaveType->name }}
 
-                                                @if($leaveType)
-                                                    <option value="{{ $leaveType->id }}" 
-                                                        {{ (!$isUnlimited && $remaining <= 0) ? 'disabled class=text-muted' : '' }}>
-                                                        
-                                                        {{ $leaveType->name }}
-
-                                                        @if($isUnlimited)
-                                                            - []
-                                                        @else
-                                                            (Sisa {{ $remaining }} / {{ $allocated }} Hari)
-                                                            @if($remaining <= 0)
-                                                                - [Kuota Habis]
-                                                            @endif
-                                                        @endif
-
-                                                    </option>
-                                                @endif
-                                            @endforeach
-                                        </select>
-                                    </div>
+                    @if($isUnlimited)
+                        - 
+                    @else
+                        (Sisa {{ $remaining }} / {{ $allocated }} Hari)
+                        
+                        @if($remaining <= 0)
+                            - [Kuota Habis]
+                        @endif
+                    @endif
+                </option>
+            @endif
+        @endforeach
+    </select>
+</div>
 
 
                                         <div class="col-md-3 mb-3">

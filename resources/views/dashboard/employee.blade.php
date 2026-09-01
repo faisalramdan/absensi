@@ -459,9 +459,9 @@
                         <div class="row mb-4">
                             @php
                                 $leaveCards = [
-                                    ['Menunggu Approval', $pendingLeaves, 'warning', 'solar:clock-circle-bold-duotone'],
-                                    ['Disetujui', $approvedLeaves, 'success', 'solar:check-circle-bold-duotone'],
-                                    ['Ditolak', $rejectedLeaves, 'danger', 'solar:close-circle-bold-duotone'],
+                                    ['Menunggu Approval', $pendingLeaves ?? 0, 'warning', 'solar:clock-circle-bold-duotone'],
+                                    ['Disetujui', $approvedLeaves ?? 0, 'success', 'solar:check-circle-bold-duotone'],
+                                    ['Ditolak', $rejectedLeaves ?? 0, 'danger', 'solar:close-circle-bold-duotone'],
                                 ];
                             @endphp
                             @foreach($leaveCards as $card)
@@ -491,6 +491,7 @@
                                     <tr>
                                         <th class="ps-4" style="width: 60px;">No</th>
                                         <th>Jenis Cuti/Izin</th>
+                                        <th>Reset/Period</th>
                                         <th class="text-center">Kuota (Hari)</th>
                                         <th class="text-center">Terpakai (Hari)</th>
                                         <th class="text-center">Sisa (Hari)</th>
@@ -498,32 +499,48 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @forelse($leaveAllocations as $index => $allocation)
+                                    @forelse($leaveAllocations ?? [] as $index => $allocation)
                                         @php
-                                            $quota = $allocation->allocated_days;
-                                            $used = $allocation->used_days;
-                                            $remaining = $allocation->remaining_days;
-                                            $percentage = $quota > 0 ? min(100, round(($used / $quota) * 100)) : 0;
+                                            $leaveType = $allocation->leaveType;
+                                            $isUnlimited = $leaveType?->is_unlimited ?? false;
+
+                                            $quota = $isUnlimited ? 0 : floatval($allocation->allocated_days);
+                                            $used = $isUnlimited ? 0 : floatval($allocation->used_days);
+                                            $remaining = $isUnlimited ? 0 : floatval($allocation->remaining_days);
+
+                                            $percentage = (!$isUnlimited && $quota > 0) ? min(100, round(($used / $quota) * 100)) : 0;
                                             $barColor = $percentage >= 80 ? 'bg-danger' : ($percentage >= 50 ? 'bg-warning' : 'bg-primary');
                                         @endphp
                                         <tr>
                                             <td class="ps-4 fw-medium text-muted">{{ $index + 1 }}</td>
                                             <td>
-                                                <div class="fw-bold text-dark">{{ $allocation->leaveType?->name ?? 'N/A' }}
-                                                </div>
+                                                <div class="fw-bold text-dark">{{ $leaveType?->name ?? 'N/A' }}</div>
                                             </td>
-                                            <td class="text-center fw-semibold text-secondary">{{ floatval($quota) }}</td>
-                                            <td class="text-center fw-semibold text-danger">{{ floatval($used) }}</td>
-                                            <td class="text-center fw-bold text-success fs-15">{{ floatval($remaining) }}</td>
+                                            <td>
+                                                <div class="fw-bold text-dark">{{ $leaveType?->reset_period ?? 'N/A' }}</div>
+                                            </td>
+                                            <td class="text-center fw-semibold text-secondary">
+                                                {{ $isUnlimited ? '-' : $quota }}
+                                            </td>
+                                            <td class="text-center fw-semibold text-danger">
+                                                {{ $isUnlimited ? ($used) : floatval($used) }}
+                                            </td>
+                                            <td class="text-center fw-bold text-success fs-15">
+                                                {{ $isUnlimited ? '-' : $remaining }}
+                                            </td>
                                             <td class="pe-4">
-                                                <div class="d-flex align-items-center justify-content-between mb-1">
-                                                    <small class="text-muted fs-11">Terpakai</small>
-                                                    <small class="fw-bold text-dark fs-11">{{ $percentage }}%</small>
-                                                </div>
-                                                <div class="progress" style="height: 6px;">
-                                                    <div class="progress-bar {{ $barColor }}" style="width: {{ $percentage }}%">
+                                                @if($isUnlimited)
+                                                    <span class="text-muted fs-12 fst-italic">-</span>
+                                                @else
+                                                    <div class="d-flex align-items-center justify-content-between mb-1">
+                                                        <small class="text-muted fs-11">Terpakai</small>
+                                                        <small class="fw-bold text-dark fs-11">{{ $percentage }}%</small>
                                                     </div>
-                                                </div>
+                                                    <div class="progress" style="height: 6px;">
+                                                        <div class="progress-bar {{ $barColor }}" style="width: {{ $percentage }}%">
+                                                        </div>
+                                                    </div>
+                                                @endif
                                             </td>
                                         </tr>
                                     @empty
