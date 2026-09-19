@@ -119,39 +119,38 @@ class DashboardController extends Controller
                 ->where('employee_contract_id', $activeContract->id)
                 ->get();
 
-            $currentMonth = date('m');
-            $currentYear = date('Y');
-
             foreach ($leaveAllocations as $allocation) {
                 $leaveType = $allocation->leaveType;
 
                 if ($leaveType && !$leaveType->is_unlimited) {
-                    $quota = floatval($leaveType->quota);
+                    // KUNCI PERBAIKAN: Ambil kuota dari alokasi spesifik karyawan, BUKAN dari master leave_types
+                    $quota = floatval($allocation->allocated_days);
 
-                    // Jika tipe cuti mereset setiap bulan (seperti IDT)
+                    // 1. Jika tipe cuti mereset setiap bulan
                     if ($leaveType->reset_period === 'month') {
                         $used = \App\Models\LeaveRequest::where('employee_id', $employee->id)
                             ->where('leave_type_id', $leaveType->id)
                             ->whereIn('status', ['pending', 'approved'])
-                            ->whereMonth('start_date', $currentMonth)
-                            ->whereYear('start_date', $currentYear)
+                            // Gunakan filter tanggal cut-off (26 bln lalu s/d 25 bln ini)
+                            ->whereBetween('start_date', [$startDateInput, $endDateInput])
                             ->sum('total_days');
 
                         $allocation->used_days = $used;
                         $allocation->remaining_days = max(0, $quota - $used);
-                        $allocation->allocated_days = $quota;
+                        $allocation->allocated_days = $quota; // Tetap 3
 
-                        // Jika tipe cuti mereset setiap tahun
+                        // 2. Jika tipe cuti mereset setiap tahun
                     } elseif ($leaveType->reset_period === 'year') {
                         $used = \App\Models\LeaveRequest::where('employee_id', $employee->id)
                             ->where('leave_type_id', $leaveType->id)
                             ->whereIn('status', ['pending', 'approved'])
-                            ->whereYear('start_date', $currentYear)
+                            // Gunakan filter tahun yang dipilih, bukan date('Y') statis
+                            ->whereYear('start_date', $selectedYear)
                             ->sum('total_days');
 
                         $allocation->used_days = $used;
                         $allocation->remaining_days = max(0, $quota - $used);
-                        $allocation->allocated_days = $quota;
+                        $allocation->allocated_days = $quota; // Tetap 3
                     }
                 }
             }

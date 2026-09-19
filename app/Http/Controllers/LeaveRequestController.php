@@ -75,9 +75,12 @@ class LeaveRequestController extends Controller
                 $leaveType = $allocation->leaveType;
 
                 if ($leaveType && !$leaveType->is_unlimited) {
-                    $quota = floatval($leaveType->quota);
+
+                    // Gunakan jatah yang tersimpan pada allocation
+                    $allocated = floatval($allocation->allocated_days);
 
                     if ($leaveType->reset_period === 'month') {
+
                         $used = \App\Models\LeaveRequest::where('employee_id', $employee->id)
                             ->where('leave_type_id', $leaveType->id)
                             ->whereIn('status', ['pending', 'approved'])
@@ -85,19 +88,21 @@ class LeaveRequestController extends Controller
                             ->whereYear('start_date', $currentYear)
                             ->sum('total_days');
 
-                        $allocation->remaining_days = max(0, $quota - $used);
-                        $allocation->allocated_days = $quota;
-
                     } elseif ($leaveType->reset_period === 'year') {
+
                         $used = \App\Models\LeaveRequest::where('employee_id', $employee->id)
                             ->where('leave_type_id', $leaveType->id)
                             ->whereIn('status', ['pending', 'approved'])
                             ->whereYear('start_date', $currentYear)
                             ->sum('total_days');
 
-                        $allocation->remaining_days = max(0, $quota - $used);
-                        $allocation->allocated_days = $quota;
+                    } else {
+                        $used = 0;
                     }
+
+                    // Hitung sisa berdasarkan alokasi aktual
+                    $allocation->allocated_days = $allocated;
+                    $allocation->remaining_days = max(0, $allocated - floatval($used));
                 }
             }
         } else {
