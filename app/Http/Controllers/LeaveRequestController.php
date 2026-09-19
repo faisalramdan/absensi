@@ -505,16 +505,15 @@ class LeaveRequestController extends Controller
             return redirect()->back()->with('error', 'Pengajuan ini sudah diproses sebelumnya.');
         }
 
-        // 1. Ambil data Jenis Cuti untuk cek is_unlimited dan reset_period
+        // Cek apakah tipe cuti ini adalah "Cuti Tanpa Batas" (is_unlimited)
         $leaveType = \App\Models\LeaveType::find($leaveRequest->leave_type_id);
         $isUnlimited = $leaveType ? $leaveType->is_unlimited : false;
-        $resetPeriod = $leaveType ? $leaveType->reset_period : 'never';
 
         // Gunakan Database Transaction agar sinkronisasi data kuota aman dan tidak bentrok
         \DB::beginTransaction();
 
         try {
-            // 2. Cari kontrak aktif milik karyawan yang mengajukan cuti
+            // 1. Cari kontrak aktif milik karyawan yang mengajukan cuti
             $activeContract = \App\Models\EmployeeContract::where('employee_id', $leaveRequest->employee_id)
                 ->where('is_active', true)
                 ->latest()
@@ -524,33 +523,36 @@ class LeaveRequestController extends Controller
                 return redirect()->back()->with('error', 'Gagal memproses. Karyawan yang mengajukan cuti tidak memiliki kontrak aktif.');
             }
 
-            // --- JIKA BUKAN CUTI TANPA BATAS ---
-            if (!$isUnlimited) {
-                // HANYA POTONG KUOTA DI TABEL LeaveAllocation JIKA RESET PERIOD-NYA 'NEVER'
-                if ($resetPeriod === 'never') {
-                    $allocation = \App\Models\LeaveAllocation::where('employee_contract_id', $activeContract->id)
-                        ->where('leave_type_id', $leaveRequest->leave_type_id)
-                        ->first();
+            // 2. Cari baris alokasi kuota yang sesuai dengan tipe cuti yang diajukan
+            $allocation = \App\Models\LeaveAllocation::where('employee_contract_id', $activeContract->id)
+                ->where('leave_type_id', $leaveRequest->leave_type_id)
+                ->first();
 
-                    if (!$allocation) {
-                        return redirect()->back()->with('error', 'Gagal memproses. Jatah alokasi cuti untuk jenis ini tidak ditemukan pada kontrak karyawan.');
-                    }
-
+            if ($allocation) {
+                if ($isUnlimited) {
+                    // JIKA CUTI TANPA BATAS (UNLIMITED): 
+                    // Hanya tambahkan used_days, remaining_days DIBIARKAN TETAP
+                    $allocation->update([
+                        'used_days' => $allocation->used_days + $leaveRequest->total_days,
+                        'updated_by' => $approverEmployee->id,
+                    ]);
+                } else {
+                    // JIKA BUKAN CUTI TANPA BATAS (TERMASUK MONTH, YEAR, NEVER): 
+                    // Lakukan validasi sisa hari & potong kuota
                     if ($allocation->remaining_days < $leaveRequest->total_days) {
                         return redirect()->back()->with('error', 'Gagal menyetujui. Sisa kuota cuti karyawan tidak mencukupi.');
                     }
 
-                    // Potong kuota di tabel Leave Allocation secara permanen
                     $allocation->update([
                         'used_days' => $allocation->used_days + $leaveRequest->total_days,
                         'remaining_days' => $allocation->remaining_days - $leaveRequest->total_days,
                         'updated_by' => $approverEmployee->id,
                     ]);
                 }
-                // Jika reset_period 'month' atau 'year', kuota di-bypass dari LeaveAllocation 
-                // karena pembatasannya dihitung secara dinamis dari riwayat leave_requests.
+            } else if (!$isUnlimited) {
+                // Jika tidak ada data alokasi dan cuti ini wajib ada kuota (bukan unlimited), tolak pengajuan
+                return redirect()->back()->with('error', 'Gagal memproses. Jatah alokasi cuti untuk jenis ini tidak ditemukan pada kontrak karyawan.');
             }
-            // --- SELESAI PROSES VALIDASI KUOTA ---
 
             // 3. Eksekusi update status pengajuan cuti
             $leaveRequest->update([
@@ -564,9 +566,9 @@ class LeaveRequestController extends Controller
             \DB::commit();
 
             // Pesan sukses dinamis
-            $pesanSukses = ($isUnlimited || $resetPeriod !== 'never')
-                ? 'Pengajuan izin/cuti berhasil disetujui.'
-                : 'Pengajuan cuti berhasil disetujui dan kuota jatah cuti karyawan telah dipotong.';
+            $pesanSukses = $isUnlimited
+                ? 'Pengajuan izin khusus / tanpa batas berhasil disetujui dan riwayat pemakaian telah dicatat.'
+                : 'Pengajuan izin/cuti berhasil disetujui dan kuota jatah izin/cuti karyawan telah dipotong.';
 
             return redirect()->back()->with('success', $pesanSukses);
 
