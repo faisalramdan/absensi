@@ -398,7 +398,8 @@ class DashboardController extends Controller
             ->get();
 
         // 8. Data Ulang Tahun Bulan Ini
-        $upcomingBirthdays = \App\Models\Employee::whereMonth('birth_date', Carbon::now()->month)
+        $upcomingBirthdays = \App\Models\Employee::where('is_active', true)
+            ->whereMonth('birth_date', Carbon::now()->month)
             ->orderByRaw('DAY(birth_date) asc') // Mengurutkan berdasarkan tanggal terkecil ke terbesar
             ->get();
 
