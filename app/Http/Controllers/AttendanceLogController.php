@@ -205,22 +205,28 @@ class AttendanceLogController extends Controller
             'file' => 'required|mimes:xls,xlsx'
         ]);
 
-        Excel::import(
-            new AttendanceLogImport,
-            $request->file('file')
-        );
+        try {
+            Excel::import(
+                new AttendanceLogImport,
+                $request->file('file')
+            );
 
-        // --- MENCATAT LOG ACTIVITY IMPORT ---
-        ActivityLogger::log(
-            'Attendance Log',
-            'Import',
-            'Melakukan import data absensi melalui file excel: ' . $request->file('file')->getClientOriginalName(),
-            [],
-            []
-        );
-        // ------------------------------------
+            // --- MENCATAT LOG ACTIVITY IMPORT ---
+            ActivityLogger::log(
+                'Attendance Log',
+                'Import',
+                'Melakukan import data absensi melalui file excel: ' . $request->file('file')->getClientOriginalName(),
+                [],
+                []
+            );
+            // ------------------------------------
 
-        return redirect()->route('attendance-logs.index')
-            ->with('success', 'Attendance berhasil diimport.');
+            return redirect()->route('attendance-logs.index')
+                ->with('success', 'Attendance berhasil diimport.');
+
+        } catch (\Exception $e) {
+            // Tangkap pesan error dari AttendanceLogImport dan kembalikan ke pengguna
+            return redirect()->back()->with('error', $e->getMessage());
+        }
     }
 }

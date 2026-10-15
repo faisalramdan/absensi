@@ -117,7 +117,7 @@ class AttendanceLogImport implements ToCollection
                 }
 
                 // Jika kosong dua-duanya, skip tanggal ini
-                if (empty($checkInRaw) && empty($emptyCheckIn) && empty($checkOutRaw)) {
+                if (empty($checkInRaw) && empty($checkOutRaw)) {
                     continue;
                 }
 
@@ -147,7 +147,24 @@ class AttendanceLogImport implements ToCollection
                     }
                 }
 
-                // Jika setelah diekstrak format jam tidak valid, jangan dimasukkan
+                // --- VALIDASI FORMAT JAM (CEK TYPO) ---
+                $timePattern = '/^([01]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/';
+
+                // Validasi Check-In
+                if (!empty($checkIn) && !preg_match($timePattern, $checkIn)) {
+                    // Indeks array $i + 2 (karena array index mulai dari 0, dan row Excel mulai dari 1)
+                    $excelRowIn = $i + 2;
+                    throw new \Exception("Gagal Import! Terdapat kesalahan ketik pada Baris ke-{$excelRowIn} (Karyawan: {$employee->full_name}) di tanggal {$date}. Format Check-In salah (Nilai saat ini: '{$checkInRaw}'). Harap perbaiki menggunakan format titik dua (contoh: 08:47:00).");
+                }
+
+                // Validasi Check-Out
+                if (!empty($checkOut) && !preg_match($timePattern, $checkOut)) {
+                    // Indeks array $i + 3
+                    $excelRowOut = $i + 3;
+                    throw new \Exception("Gagal Import! Terdapat kesalahan ketik pada Baris ke-{$excelRowOut} (Karyawan: {$employee->full_name}) di tanggal {$date}. Format Check-Out salah (Nilai saat ini: '{$checkOutRaw}'). Harap perbaiki menggunakan format titik dua (contoh: 17:00:00).");
+                }
+
+                // Jika setelah diekstrak format jam tidak valid/kosong, jangan dimasukkan
                 if (empty($checkIn) && empty($checkOut)) {
                     continue;
                 }

@@ -6,7 +6,26 @@
         <div class="page-content">
 
             <div class="container-xxl">
+                {{-- Menampilkan Error dari try-catch (Misal: Kesalahan format jam) --}}
+                @if (session('error'))
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <strong>Gagal Import!</strong> {{ session('error') }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                @endif
 
+                {{-- Menampilkan Error Validasi (Misal: Lupa pilih file atau salah format file) --}}
+                @if ($errors->any())
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <strong>Ups! Ada yang salah:</strong>
+                        <ul class="mb-0 mt-1">
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                @endif
                 {{-- INFORMASI / PANDUAN IMPORT --}}
                 <div class="card border-0 shadow-sm mb-4">
                     <div class="card-header bg-light d-flex align-items-center">
