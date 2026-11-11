@@ -25,12 +25,15 @@
                         class="btn btn-soft-secondary d-inline-flex align-items-center gap-1">
                         <iconify-icon icon="solar:arrow-left-broken" class="fs-18"></iconify-icon> Kembali ke Daftar
                     </a>
-                    @can('employee-contract.edit')
-                        <a href="{{ route('employee-contracts.edit', $employeeContract) }}"
-                            class="btn btn-primary d-inline-flex align-items-center gap-1">
-                            <iconify-icon icon="solar:pen-2-broken" class="fs-18"></iconify-icon> Edit Kontrak
-                        </a>
-                    @endcan
+                    @if($employeeContract->is_active)
+                        @can('employee-contract.edit')
+                            <a href="{{ route('employee-contracts.edit', $employeeContract) }}"
+                                class="btn btn-primary d-inline-flex align-items-center gap-1">
+                                <iconify-icon icon="solar:pen-2-broken" class="fs-18"></iconify-icon>
+                                Edit Kontrak
+                            </a>
+                        @endcan
+                    @endif
                 </div>
 
                 <div class="row">
@@ -210,10 +213,12 @@
                                         class="text-primary me-2 fs-20"></iconify-icon>
                                     Alokasi Jatahan Cuti/Izin Karyawan
                                 </h5>
-                                <button type="button" class="btn btn-primary btn-sm d-inline-flex align-items-center gap-1"
-                                    data-bs-toggle="modal" data-bs-target="#addLeaveAllocationModal">
-                                    + Alokasikan Cuti
-                                </button>
+                                @if($employeeContract->is_active)
+                                    <button type="button" class="btn btn-primary btn-sm d-inline-flex align-items-center gap-1"
+                                        data-bs-toggle="modal" data-bs-target="#addLeaveAllocationModal">
+                                        + Alokasikan Cuti
+                                    </button>
+                                @endif
                             </div>
                             <div class="card-body p-0">
                                 <div class="table-responsive">
@@ -256,17 +261,22 @@
                                                     </td>
                                                     <td><small class="text-muted">{{ $allocation->notes ?? '-' }}</small></td>
                                                     <td class="text-center">
-                                                        <form action="{{ route('leave-allocations.destroy', $allocation->id) }}"
-                                                            method="POST" class="d-inline delete-allocation-form">
-                                                            @csrf
-                                                            @method('DELETE')
-                                                            <button type="button"
-                                                                class="btn btn-soft-danger btn-sm btn-delete-allocation"
-                                                                data-bs-toggle="tooltip" title="Hapus Alokasi">
-                                                                <iconify-icon icon="solar:trash-bin-minimalistic-2-broken"
-                                                                    class="fs-16 align-middle"></iconify-icon>
-                                                            </button>
-                                                        </form>
+                                                        @if($employeeContract->is_active)
+                                                            <form action="{{ route('leave-allocations.destroy', $allocation->id) }}"
+                                                                method="POST" class="d-inline delete-allocation-form">
+                                                                @csrf
+                                                                @method('DELETE')
+
+                                                                <button type="button"
+                                                                    class="btn btn-soft-danger btn-sm btn-delete-allocation"
+                                                                    data-bs-toggle="tooltip" title="Hapus Alokasi">
+                                                                    <iconify-icon icon="solar:trash-bin-minimalistic-2-broken"
+                                                                        class="fs-16 align-middle"></iconify-icon>
+                                                                </button>
+                                                            </form>
+                                                        @else
+                                                            <span class="text-muted small">-</span>
+                                                        @endif
                                                     </td>
                                                 </tr>
                                             @empty

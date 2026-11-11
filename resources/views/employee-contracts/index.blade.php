@@ -211,15 +211,20 @@
                                                                 </a>
                                                             @endcan
 
+                                                            @if($contract->is_active)
+                                                            {{-- Tombol Edit --}}
                                                             @can('employee-contract.edit')
                                                                 <a href="{{ route('employee-contracts.edit', $contract) }}"
-                                                                    class="btn btn-soft-primary btn-sm" data-bs-toggle="tooltip"
-                                                                    data-bs-placement="top" data-bs-title="Edit">
+                                                                    class="btn btn-soft-primary btn-sm"
+                                                                    data-bs-toggle="tooltip"
+                                                                    data-bs-placement="top"
+                                                                    data-bs-title="Edit">
                                                                     <iconify-icon icon="solar:pen-2-broken"
                                                                         class="align-middle fs-18"></iconify-icon>
                                                                 </a>
                                                             @endcan
 
+                                                            {{-- Tombol Hapus --}}
                                                             @can('employee-contract.delete')
                                                                 <form action="{{ route('employee-contracts.destroy', $contract) }}"
                                                                     method="POST" class="d-inline" delete-form>
@@ -228,7 +233,8 @@
 
                                                                     <button type="button"
                                                                         class="btn btn-soft-danger btn-sm btn-delete"
-                                                                        data-bs-toggle="tooltip" data-bs-placement="top"
+                                                                        data-bs-toggle="tooltip"
+                                                                        data-bs-placement="top"
                                                                         data-bs-title="Hapus Permanent">
                                                                         <iconify-icon icon="solar:trash-bin-minimalistic-2-broken"
                                                                             class="align-middle fs-18">
@@ -236,6 +242,7 @@
                                                                     </button>
                                                                 </form>
                                                             @endcan
+                                                        @endif
                                                         </div>
                                                     </td>
                                                 </tr>
