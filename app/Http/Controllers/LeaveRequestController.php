@@ -40,7 +40,7 @@ class LeaveRequestController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        // ini penting
+        // ini penting 
         $leaveTypes = LeaveType::all();
 
         return view('leave-requests.index', compact('leaveRequests', 'leaveTypes'));
@@ -51,36 +51,38 @@ class LeaveRequestController extends Controller
         // 1. Ambil data karyawan yang sedang login
         $employee = auth()->user()->employee;
 
-
         if (!$employee) {
             return redirect()->back()->with('error', 'Gagal memuat formulir. Akun Anda belum terhubung dengan data Karyawan.');
         }
 
-        // 2. Ambil data kontrak karyawan yang saat ini statusnya Aktif ('t') yang terbaru
+        // 2. Ambil data kontrak karyawan yang saat ini statusnya Aktif yang terbaru
         $activeContract = \App\Models\EmployeeContract::where('employee_id', $employee->id)
             ->where('is_active', true)
-            ->latest()
+            ->orderByDesc('start_date')
             ->first();
 
-        // 3. Jika kontrak aktif ditemukan, ambil jatah alokasi cutinya. Jika tidak ada, buat koleksi kosong.
+        // 3. Jika kontrak aktif ditemukan, ambil jatah alokasi cutinya
         if ($activeContract) {
             $leaveAllocations = \App\Models\LeaveAllocation::where('employee_contract_id', $activeContract->id)
                 ->with('leaveType')
                 ->get();
 
-            $currentMonth = date('m');
             $currentYear = date('Y');
+            $currentMonth = date('m');
 
             foreach ($leaveAllocations as $allocation) {
                 $leaveType = $allocation->leaveType;
 
                 if ($leaveType && !$leaveType->is_unlimited) {
 
-                    // Gunakan jatah yang tersimpan pada allocation
-                    $allocated = floatval($allocation->allocated_days);
+                    // Ambil kuota dari alokasi spesifik kontrak aktif
+                    $quota = floatval($allocation->allocated_days);
 
+                    // KUNCI PERBAIKAN: 
+                    // Jika cuti berjenis 'never' (seperti cuti tahunan kontrak), pemakaian ($used) 
+                    // WAJIB dicek berdasarkan tanggal mulai kontrak baru (start_date kontrak aktif) 
+                    // agar cuti dari kontrak lama tidak ikut terhitung.
                     if ($leaveType->reset_period === 'month') {
-
                         $used = \App\Models\LeaveRequest::where('employee_id', $employee->id)
                             ->where('leave_type_id', $leaveType->id)
                             ->whereIn('status', ['pending', 'approved'])
@@ -89,7 +91,6 @@ class LeaveRequestController extends Controller
                             ->sum('total_days');
 
                     } elseif ($leaveType->reset_period === 'year') {
-
                         $used = \App\Models\LeaveRequest::where('employee_id', $employee->id)
                             ->where('leave_type_id', $leaveType->id)
                             ->whereIn('status', ['pending', 'approved'])
@@ -97,18 +98,23 @@ class LeaveRequestController extends Controller
                             ->sum('total_days');
 
                     } else {
-                        $used = 0;
+                        // Cuti berbasis kontrak aktif
+                        $contractStartDate = Carbon::parse($activeContract->start_date)->toDateString();
+
+                        $used = \App\Models\LeaveRequest::where('employee_id', $employee->id)
+                            ->where('leave_type_id', $leaveType->id)
+                            ->whereIn('status', ['pending', 'approved'])
+                            ->whereDate('start_date', '>=', $contractStartDate)
+                            ->sum('total_days');
                     }
 
-                    // Hitung sisa berdasarkan alokasi aktual
-                    $allocation->allocated_days = $allocated;
-                    $allocation->remaining_days = max(0, $allocated - floatval($used));
+                    $allocation->allocated_days = $quota;
+                    $allocation->remaining_days = max(0, $quota - floatval($used));
                 }
             }
         } else {
             $leaveAllocations = collect();
         }
-
 
         // 4. Lempar variabel ke view blade leave-requests/create.blade.php
         return view(
@@ -181,15 +187,16 @@ class LeaveRequestController extends Controller
                 }
 
             } else {
-                // Untuk reset_period = 'never', gunakan tabel alokasi permanen
+                // Cuti berdasarkan kontrak aktif
+
                 $activeContract = \App\Models\EmployeeContract::where('employee_id', $employee->id)
                     ->where('is_active', true)
-                    ->latest()
+                    ->orderByDesc('start_date')
                     ->first();
 
                 if (!$activeContract) {
                     return back()->withInput()->withErrors([
-                        'leave_type_id' => 'Anda tidak memiliki kontrak aktif yang terdaftar.'
+                        'leave_type_id' => 'Anda tidak memiliki kontrak aktif.'
                     ]);
                 }
 
@@ -197,9 +204,27 @@ class LeaveRequestController extends Controller
                     ->where('leave_type_id', $request->leave_type_id)
                     ->first();
 
-                if (!$allocation || floatval($allocation->remaining_days) < $totalDays) {
+                if (!$allocation) {
                     return back()->withInput()->withErrors([
-                        'leave_type_id' => 'Kuota cuti Anda sudah habis atau belum dialokasikan.'
+                        'leave_type_id' => 'Jatah cuti belum dialokasikan pada kontrak aktif.'
+                    ]);
+                }
+
+                $contractStartDate = Carbon::parse($activeContract->start_date)->toDateString();
+
+                // Hitung pemakaian cuti kontrak aktif, termasuk pending
+                $used = \App\Models\LeaveRequest::where('employee_id', $employee->id)
+                    ->where('leave_type_id', $leaveType->id)
+                    ->whereIn('status', ['pending', 'approved'])
+                    ->whereDate('start_date', '>=', $contractStartDate)
+                    ->sum('total_days');
+
+                $remainingLeave = floatval($allocation->allocated_days) - floatval($used);
+
+                if ($remainingLeave < $totalDays) {
+                    return back()->withInput()->withErrors([
+                        'leave_type_id' => 'Sisa kuota cuti Anda hanya ' . $remainingLeave .
+                            ' hari. Pengajuan Anda: ' . $totalDays . ' hari.'
                     ]);
                 }
             }
@@ -331,7 +356,16 @@ class LeaveRequestController extends Controller
                 ]);
             }
 
-            $remainingLeave = floatval($allocation->remaining_days);
+            $contractStartDate = Carbon::parse($activeContract->start_date)->toDateString();
+
+            $used = \App\Models\LeaveRequest::where('employee_id', $employee->id)
+                ->where('leave_type_id', $request->leave_type_id)
+                ->whereIn('status', ['pending', 'approved'])
+                ->whereDate('start_date', '>=', $contractStartDate)
+                ->where('id', '!=', $leaveRequest->id)
+                ->sum('total_days');
+
+            $remainingLeave = floatval($allocation->allocated_days) - floatval($used);
 
             if ($totalDays > $remainingLeave) {
                 return back()->withInput()->withErrors([
