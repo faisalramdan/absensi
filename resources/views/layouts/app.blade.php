@@ -31,6 +31,30 @@
     <link href="{{ asset('assets/vendor/fullcalendar/main.min.css') }}" rel="stylesheet" type="text/css" />
 
     <!-- Custom Page CSS -->
+    <style>
+        /* Fix footer positioning */
+        .page-content {
+            display: flex !important;
+            flex-direction: column !important;
+            min-height: 100vh !important;
+            height: auto !important;
+        }
+
+        .page-content main.content {
+            flex: 1 0 auto !important;
+            width: 100%;
+        }
+
+        .page-content footer.footer {
+            position: relative !important;
+            bottom: auto !important;
+            left: auto !important;
+            width: 100%;
+            margin-top: auto !important;
+            flex-shrink: 0;
+        }
+    </style>
+
     @stack('styles')
 
 
@@ -45,9 +69,7 @@
         @include('layouts.topbar')
 
         <main class="content">
-
             @yield('content')
-
         </main>
 
         @include('layouts.footer')

@@ -210,11 +210,17 @@
 
                                    <form method="POST" action="{{ route('logout') }}">
                                         @csrf
-                                        <a href="{{ route('logout') }}" class="dropdown-item text-danger"
-                                             onclick="event.preventDefault(); this.closest('form').submit();">
+
+                                        <button type="submit"
+                                             class="dropdown-item text-danger border-0 bg-transparent w-100 text-start">
+
                                              <i class="bx bx-log-out fs-18 align-middle me-1"></i>
-                                             <span class="align-middle">Keluar dari sistem</span>
-                                        </a>
+
+                                             <span class="align-middle">
+                                                  Keluar dari sistem
+                                             </span>
+
+                                        </button>
                                    </form>
                               </div>
                          </div>
