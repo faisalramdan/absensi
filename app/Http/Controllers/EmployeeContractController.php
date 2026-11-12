@@ -68,7 +68,11 @@ class EmployeeContractController extends Controller
             ->when($selectedStatus, function ($query) use ($selectedStatus) {
                 $query->where('employee_status_id', $selectedStatus);
             })
-            ->latest()
+            ->orderBy(
+                Employee::select('full_name')
+                    ->whereColumn('employees.id', 'employee_contracts.employee_id'),
+                'asc'
+            )
             ->paginate(10)
             ->withQueryString(); // Memastikan parameter filter tidak hilang saat pindah halaman pagination
 
